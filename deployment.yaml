@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multireact-add-slack-app
+  namespace: sgt-bot
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: multireact-add-slack-app
+    spec:
+      containers:
+      - env:
+        - name: SLACK_CLIENT_ID
+          value: tba
+        - name: SLACK_CLIENT_SECRET
+          value: tba
+        - name: SLACK_SIGNING_SECRET
+          value: tba
+        image: registry.corp.midasplayer.com/king/multireact-add:0.1
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /slack/healthcheck
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 2
+        name: multireact-add-slack-app
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /slack/healthcheck
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 2
+          timeoutSeconds: 2
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 512M
+          limits:
+            cpu: 4
+            memory: 512M
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: multireact-add-slack-app-ingress
+  namespace: sgt-bot
+  annotations:
+    kubernetes.io/ingress.class: nginx-int-cloud-king-com
+spec:
+  rules:
+  - host: multireact-add-slack-app.int.cloud.king.com
+    http:
+      paths:
+      - backend:
+          serviceName: multireact-add-slack-app
+          servicePort: 3000
+  tls:
+  - hosts:
+    - multireact-add-slack-app.int.cloud.king.com
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: multireact-add-slack-app
+  namespace: sgt-bot
+spec:
+  selector:
+    app: multireact-add-slack-app
+  ports:
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 3000

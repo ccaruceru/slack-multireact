@@ -1,0 +1,8 @@
+.vscode
+appdata
+userdata
+__pycache__
+docs
+.gitignore
+README.md
+deployment.yaml

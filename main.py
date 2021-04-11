@@ -10,12 +10,7 @@ from slack_bolt.oauth.oauth_settings import OAuthSettings
 from slack_sdk.errors import SlackApiError
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
-# from slack_bolt.adapter.flask import SlackRequestHandler # use flask adapter for prod: https://slack.dev/bolt-python/concepts#adapters
-from slack_bolt.adapter.bottle import SlackRequestHandler # use flask adapter for prod: https://slack.dev/bolt-python/concepts#adapters
-
-# from flask import Flask, request
-# from waitress import serve
-from slack_bolt.adapter.cherrypy import SlackRequestHandler
+from slack_bolt.adapter.cherrypy import SlackRequestHandler # https://slack.dev/bolt-python/concepts#adapters
 import cherrypy
 
 
@@ -49,18 +44,17 @@ app = App(
         state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=APP_DATA_DIR)
     )
 )
-
-# flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
+
 
 class SlackApp(object):
     @cherrypy.expose
     @cherrypy.tools.slack_in()
     def events(self, **kwargs):
-        """Handles all incoming slack API calls made by users using a SlackRequestHandler
+        """Handles /slack/events which are all incoming slack API calls made by users
 
         Returns:
-            Response: a Flask HTTP response for the event triggered by the user
+            Response: a utf-8 byte array with an HTTP response for the event triggered by the user
         """
         return handler.handle()
 
@@ -68,10 +62,10 @@ class SlackApp(object):
     @cherrypy.expose
     @cherrypy.tools.slack_in()
     def install(self, **kwargs):
-        """Starts Slack OAuth flow (i.e. app installation)
+        """Handles /slack/install and starts Slack OAuth flow (i.e. user installs the app)
 
         Returns:
-            Response: a Flask HTTP response with a payload to request app installation in a workspace
+            bytes: a utf-8 byte array with an HTTP response containing a payload to request app authorization for a user
         """
         return handler.handle()
 
@@ -79,42 +73,22 @@ class SlackApp(object):
     @cherrypy.expose
     @cherrypy.tools.slack_in()
     def oauth_redirect(self, **kwargs):
-        """Handles the redirection from Slack's OAuth flow
+        """Handles /slack/oauth_redirect to save the user OAuth credentials after app usage has been authorized
 
         Returns:
-            Response: a Flask HTTP response to redirect the user to Slack after user authorized the app usage
+            bytes: a utf-8 byte array with an HTTP response to redirect the user to Slack after user authorized the app usage
         """
         return handler.handle()
 
 
-# @flask_app.route("/slack/events", methods=["POST"])
-# def slack_events():
-#     """Handles all incoming slack API calls made by users using a SlackRequestHandler
+    @cherrypy.expose
+    def healthcheck(self):
+        """Handles /healthcheck api endpoint
 
-#     Returns:
-#         Response: a Flask HTTP response for the event triggered by the user
-#     """
-#     return handler.handle(request)
-
-
-# @flask_app.route("/slack/install", methods=["GET"])
-# def install():
-#     """Starts Slack OAuth flow (i.e. app installation)
-
-#     Returns:
-#         Response: a Flask HTTP response with a payload to request app installation in a workspace
-#     """
-#     return handler.handle(request)
-
-
-# @flask_app.route("/slack/oauth_redirect", methods=["GET"])
-# def oauth_redirect():
-#     """Handles the redirection from Slack's OAuth flow
-
-#     Returns:
-#         Response: a Flask HTTP response to redirect the user to Slack after user authorized the app usage
-#     """
-#     return handler.handle(request)
+        Returns:
+            str: A success message
+        """
+        return "App is running"
 
 
 def _get_reactions_in_team(client):
@@ -338,13 +312,17 @@ if __name__ == "__main__":
     """
     port = int(os.environ.get("PORT", 3000))
     logging.info(f"Listening on port {port}")
-    # threads = int(os.environ.get("WAITRESS_THREADS", 16)) #TODO: stress test
-    # logging.info(f"Setting the number of threads to {threads}")
     update_thread = threading.Thread(target=update_emoji_list, name="EmojiUpdate", daemon=True) # daemon=don't wait for it when program exits
     update_thread.start()
-    # app.start(port=port) # start the bot
-    # flask_app.run(port=port) # start the bot
-    # serve(flask_app, host="0.0.0.0", port=port, threads=threads) # start the bot
-    cherrypy.server.socket_port = port
-    cherrypy.server.socket_host = '0.0.0.0'
-    cherrypy.quickstart(SlackApp(), "/slack") # POST /slack/events HTTP/1.1" 404 30
+    cherrypy.config.update({
+        'global': {
+            'server.socket_host': '0.0.0.0',
+            'server.socket_port': port,
+        }
+    })
+    if "ENVIRONMENT" in os.environ and os.environ["ENVIRONMENT"]:
+        logging.info(f"Setting cherrypy environemnt to {os.environ['ENVIRONMENT']}")
+        cherrypy.config.update({ 'global': { 'environment' : os.environ["ENVIRONMENT"] }})
+
+    cherrypy.quickstart(SlackApp(), "/slack") # TODO: POST /slack/events HTTP/1.1" 404 30
+    # TODO: USE SOCKET MODE https://slack.dev/bolt-python/concepts#socket-mode
