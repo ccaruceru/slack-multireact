@@ -38,6 +38,10 @@ spec:
           successThreshold: 1
           timeoutSeconds: 2
         name: multireact-add-slack-app
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
         readinessProbe:
           failureThreshold: 3
           httpGet:
@@ -75,17 +79,3 @@ spec:
   tls:
   - hosts:
     - multireact-add-slack-app.int.cloud.king.com
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: multireact-add-slack-app
-  namespace: sgt-bot
-spec:
-  selector:
-    app: multireact-add-slack-app
-  ports:
-    - name: https
-      protocol: TCP
-      port: 443
-      targetPort: 3000

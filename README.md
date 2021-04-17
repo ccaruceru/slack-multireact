@@ -52,9 +52,9 @@ Build and push the image to [King's registry](https://registry.corp.midasplayer.
 
 ## Environment variables
 Mandatory variables from the app's **Basic Information** page:
-- SLACK_SIGNING_SECRET: the **Signing Secret**
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
+- SLACK_SIGNING_SECRET: the **Signing Secret**
 <img src="docs/app-credentials.png" alt="app-credentials" width="500"/>
 
 Optional:
@@ -103,9 +103,9 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
             "program": "main.py",
             "console": "integratedTerminal",
             "env": {
-                "SLACK_SIGNING_SECRET": "signingsecret",
                 "SLACK_CLIENT_ID": "clientid",
                 "SLACK_CLIENT_SECRET": "clientsecret",
+                "SLACK_SIGNING_SECRET": "signingsecret",
                 "APP_HOME": "/tmp/mutlireact",
                 "PORT": "3000",
                 "LOG_LEVEL": "INFO"
