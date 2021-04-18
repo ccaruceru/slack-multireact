@@ -1,4 +1,3 @@
 .vscode
-appdata
-userdata
 __pycache__
+*key.json

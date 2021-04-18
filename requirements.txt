@@ -1,2 +1,6 @@
 slack-bolt==1.4.4
-CherryPy==18.6.0
+google-cloud-storage==1.37.1
+
+# Flask is part of Google function requirements
+# https://cloud.google.com/functions/docs/writing/specifying-dependencies-python#pre-installed_packages
+# Flask==1.1.2

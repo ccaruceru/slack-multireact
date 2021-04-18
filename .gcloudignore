@@ -1,8 +1,7 @@
 .vscode
-appdata
-userdata
 __pycache__
 docs
+.git
 .gitignore
 README.md
-deployment.yaml
+*key.json
