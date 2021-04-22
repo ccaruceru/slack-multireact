@@ -1,3 +1,7 @@
+#
+# adaptation of https://github.com/slackapi/python-slack-sdk/blob/main/slack_sdk/oauth/state_store/amazon_s3/__init__.py
+#
+
 import logging
 import time
 from logging import Logger

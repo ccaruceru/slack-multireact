@@ -8,6 +8,7 @@ from time import sleep
 from slack_bolt import App
 from slack_bolt.oauth.oauth_settings import OAuthSettings
 from slack_sdk.errors import SlackApiError
+from slack_sdk.web import SlackResponse
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
 from slack_bolt.adapter.flask import SlackRequestHandler # https://slack.dev/bolt-python/concepts#adapters
@@ -28,7 +29,7 @@ BUCKET = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])
 # Initialize the app with the OAuth configuration
 # TODO: asyncio app
 app = App(
-    process_before_response=("LOCAL_DEVELOPMENT" not in os.environ), # process_before_response must be True when running on FaaS
+    # process_before_response=("LOCAL_DEVELOPMENT" not in os.environ), # process_before_response must be True when running on FaaS
     signing_secret=os.environ["SLACK_SIGNING_SECRET"],
     oauth_settings=OAuthSettings(
         client_id=os.environ["SLACK_CLIENT_ID"],
@@ -63,7 +64,8 @@ def _get_reactions_in_team(client):
     try:
         response = client.emoji_list(include_categories=True)
     finally:
-        sleep(TIER2_LIMIT_SEC)
+        # sleep(TIER2_LIMIT_SEC)
+        pass
 
     custom_emojis = list(response["emoji"].keys())
     builtin_emojis = [emj for cat in response["categories"] for emj in cat["emoji_names"]]
@@ -86,7 +88,8 @@ def _get_valid_reactions(text, client):
         return []
 
     reactions = [r[1:-1] for r in reactions] # strip the colons
-    return [r for r in reactions if r in _get_reactions_in_team(client)]
+    all_reactions = _get_reactions_in_team(client)
+    return [r for r in reactions if r in all_reactions]
 
 
 def _get_rendered_reactions(reactions):
@@ -151,14 +154,16 @@ def save_or_display_reactions(ack, client, command, respond, logger):
                 respond(f"Your current reactions are: {_get_rendered_reactions(reactions)}. Type `/multireact <new list of emojis>` to change them.")
                 logger.info(f"User {user_id} loaded {reactions}")
             finally:
-                sleep(TIER4_LIMIT_SEC)
+                # sleep(TIER4_LIMIT_SEC)
+                pass
 
         else: # or say that user doesn't have any
             try:
                 respond("You do not have any reactions set :anguished:\nType `/multireact <list of emojis>` to set one.")
                 logger.info(f"User {user_id} has no reactions")
             finally:
-                sleep(TIER4_LIMIT_SEC)
+                # sleep(TIER4_LIMIT_SEC)
+                pass
 
 
 @app.shortcut("add_reactions")
@@ -201,10 +206,11 @@ def add_reactions(ack, shortcut, client, logger, context):
                     )
                     logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
                 finally:
-                    sleep(TIER3_LIMIT_SEC)
+                    # sleep(TIER3_LIMIT_SEC)
+                    pass
 
             except SlackApiError as err: # if the error message says the user already reacted then ignore it
-                if not ("error" in err.response.data and err.response.data["error"] == "already_reacted"):
+                if not (type(err.response) is SlackResponse and "error" in err.response.data and err.response.data["error"] == "already_reacted"):
                     raise err
 
     else: # if user set no reactions, display a dialogue to inform the user that no reactions are set
@@ -234,7 +240,8 @@ def add_reactions(ack, shortcut, client, logger, context):
             )
             logger.info(f"User {user_id} has no reactions")
         finally:
-            sleep(TIER4_LIMIT_SEC)
+            # sleep(TIER4_LIMIT_SEC)
+            pass
 
 
 # TODO: handle token revoked and app uninstalled events: https://gist.github.com/seratch/d81a445ef4467b16f047156bf859cda8#file-main-py-L50-L65

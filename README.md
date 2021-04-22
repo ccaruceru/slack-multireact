@@ -31,11 +31,11 @@ The application requires 3 GCS buckets to store temporary data for the oauth pro
 
 Sample commands to create the buckets:
 ```bash
-gsutil mb -c STANDARD -l europe-west3 -b on gs://multi-reaction-add-userdata
+gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-userdata
 
-gsutil mb -c STANDARD -l europe-west3 -b on gs://multi-reaction-add-userdata
+gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-oauthstate
 
-gsutil mb -c STANDARD -l europe-west3 -b on gs://multi-reaction-add-userdata
+gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-installation
 ```
 
 ## Service account
@@ -50,17 +50,17 @@ gcloud iam service-accounts list
 ```
 Grant permissions for each bucket:
 ```bash
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-sgt-bots-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
+gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
 
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-sgt-bots-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-oauthstate
+gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-oauthstate
 
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-sgt-bots-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-installation
+gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-installation
 ```
 
 ## Create Slack application
 
 ### Interactivity & Shortcuts
-- Add `<bot address>` to **Request URL** (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
 - **Create New Shortcut**
     - with **On messages** type
     - that has the Callback ID named `add_reactions`
@@ -69,11 +69,11 @@ gsutil iam ch serviceAccount:sa-multireact-slack-app@king-sgt-bots-dev.iam.gserv
 ### Slash commands
 - **Create New Command**
     - Command is `/multireact`
-    - Request URL is `<bot address>` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+    - Request URL is `<bot address>/slack/events` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
 <img src="docs/create-command.png" alt="create-command" width="500"/>
 
 ### OAuth & Permissions
-- **Add New Redirect URL** and use `<bot address>` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
 - **Scopes**
     - **Bot Token Scopes**: Add and OAuth scope for `commands` (might be already added)
 <img src="docs/add-scopes.png" alt="add-scope" width="500"/>
@@ -104,13 +104,17 @@ Optional:
 
 Deploy the function using the following command:
 ```bash
-gcloud functions deploy multireact-add-slack-app --runtime python38 --trigger-http --allow-unauthenticated --env-vars-file .env.yaml --region=europe-west3 --source=. --entry-point=entrypoint --service-account=sa-multireact-slack-app@king-sgt-bots-dev.iam.gserviceaccount.com
+gcloud functions deploy multireact-add-slack-app --runtime python38 --trigger-http --allow-unauthenticated --env-vars-file .env.yaml --region=europe-west1 --source=. --entry-point=entrypoint --service-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com
 ```
-Describe the function to get the HTTP endpoint:
+
+**Notes**
+- Google Cloud Functions and Google Cloud Build services must be enabled for the project
+- `--allow-unauthenticated` flag implies that the user who deploys the function has **Security Admin** role in order to assing `roles/cloudfunctions.invoker` to `allUsers` for the deployed function, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_
+
+Describe the function to get the HTTPS endpoint:
 ```bash
 gcloud functions describe multireact-add-slack-app
 ```
-TBA: Edit `Permissions` and `Add` a new permission for `allUsers` with the role `Cloud Function Invoker`
 
 # Local development
 To start development for this app, it is recommended to have installed **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
@@ -125,7 +129,7 @@ To start development for this app, it is recommended to have installed **Python 
 - create GCS buckets described in [Google Storage buckets](#google-storage-buckets)
 - create a service account similar to [Service account](#service-account) and generate a key for the account:
 ```bash
-gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-slack-app@king-sgt-bots-dev.iam.gserviceaccount.com
+gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com
 ```
 - set environment variables according to [Environment variables](#environment-variables) section, along with:
     - LOCAL_DEVELOPMENT: set to any value to run the application in standalone mode and not in a Google Cloud Function

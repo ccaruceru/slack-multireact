@@ -1,3 +1,7 @@
+#
+# adaptation of from https://github.com/slackapi/python-slack-sdk/blob/main/slack_sdk/oauth/installation_store/amazon_s3/__init__.py
+#
+
 import json
 import logging
 from logging import Logger
