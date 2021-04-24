@@ -23,7 +23,7 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
 
 # Google Cloud deployment
 
-The deployment process consists in creating two Google Cloud components: A [Function](https://cloud.google.com/functions/docs/quickstart-python) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
+The deployment process consists in creating two Google Cloud components: A Google Cloud Run [Service](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/python) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
 
 ## Google Storage buckets
 
@@ -98,30 +98,51 @@ Along with Google Cloud Storage bucket names:
 - USER_DATA_BUCKET_NAME: bucket for user emoji data
 
 Optional:
+- PORT: port where the app is listening. defaults to `3000`
 - LOG_LEVEL: log verosity. defaults to `INFO`
 
-### Google Cloud Function
+### Google Cloud Run
 
-Deploy the function using the following command:
+Build the image and deploy it to [Google Cloud Registry](https://cloud.google.com/container-registry):
+
 ```bash
-gcloud functions deploy multireact-add-slack-app --runtime python38 --trigger-http --allow-unauthenticated --env-vars-file .env.yaml --region=europe-west1 --source=. --entry-point=entrypoint --service-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com
+# gcloud auth login # login to the gcp project
+# gcloud auth configure-docker # setup docker credentials for gcr
+docker build -t eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app .
+docker push eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app
+```
+
+Deploy the container to Google Cloud Run using the following command:
+```bash
+gcloud run deploy multireact-slack-app\
+ --image eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app\
+ --platform managed\ # Fully managed version of Cloud Run
+ --cpu=1\ # CPU limit
+ --memory=512Mi\ # memory limit
+ --min-instances=2\ # min instances
+ --max-instances=20\ # max instances
+ --region=europe-west1\
+ --port=3000\ # container port
+ --service-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com\
+ --set-env-vars=SLACK_CLIENT_ID=<client id>,SLACK_CLIENT_SECRET=<client secret>,SLACK_SIGNING_SECRET=<signing secret>,SLACK_INSTALLATION_GOOGLE_BUCKET_NAME=multi-reaction-add-installation,SLACK_STATE_GOOGLE_BUCKET_NAME=multi-reaction-add-oauthstate,USER_DATA_BUCKET_NAME=multi-reaction-add-userdata\ # env vars
+ --allow-unauthenticated # make service publicly accessible
 ```
 
 **Notes**
-- Google Cloud Functions and Google Cloud Build services must be enabled for the project
-- `--allow-unauthenticated` flag implies that the user who deploys the function has **Security Admin** role in order to assing `roles/cloudfunctions.invoker` to `allUsers` for the deployed function, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_
+- Google Cloud Run service must be enabled for the project
+- `--allow-unauthenticated` flag implies that the user who deploys the container has either **Owner** or **Cloud Run Admin** role in order to assing `roles/run.invoker` to `allUsers` for the deployed service, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_
 
-Describe the function to get the HTTPS endpoint:
+Describe the running container to get the HTTPS endpoint:
 ```bash
-gcloud functions describe multireact-add-slack-app
+gcloud run services list
 ```
 
 # Local development
-To start development for this app, it is recommended to have installed **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
+To start development for this app install **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
 - `pip install -r requirements.txt`
-- in a sepparate terminal run `ngrok http 3000` and take a note of the _generated https address_
+- in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
     - **note**: sometimes the VPN client will prevent ngrok from establishing a connection
-- setup a slack application according to [Create Slack application](#create-slack-application) section, using ngrok's _generated https address_
+- setup a slack application according to [Create Slack application](#create-slack-application) section, using ngrok's _ngrok generated https address_
     - when running the application locally, the HTTP endpoints created by Bolt framework are:
         - **/slack/events** - used as _Request URL_ for incoming slack API requests (commands and shortcuts)
         - **/slack/install** - simple interface which allows a user to install the app to a workspace and start the OAuth flow
@@ -132,11 +153,9 @@ To start development for this app, it is recommended to have installed **Python 
 gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com
 ```
 - set environment variables according to [Environment variables](#environment-variables) section, along with:
-    - LOCAL_DEVELOPMENT: set to any value to run the application in standalone mode and not in a Google Cloud Function
-    - GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets
-    - LOCAL_PORT: port where the app exposes an http endpoint for local development. defaults to 3000
+    - GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets (e.g. sa-multireact-key.json)
 - `python main.py` to run the app
-- go to "_generated https address_/slack/install" to install the app to the workspace and start interracting like in the [Usage](#usage) section.
+- go to "_ngrok generated https address_/slack/install" to install the app to the workspace and start interracting like in the [Usage](#usage) section.
 
 ## Debugging with VS Code
 
@@ -156,8 +175,7 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
                 "SLACK_CLIENT_SECRET": "clientsecret",
                 "SLACK_SIGNING_SECRET": "signingsecret",
                 "LOG_LEVEL": "INFO",
-                "LOCAL_DEVELOPMENT": "true",
-                "LOCAL_PORT": "3000",
+                "PORT": "3000",
                 "GOOGLE_APPLICATION_CREDENTIALS": "sa-multireact-key.json",
                 "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME": "multi-reaction-add-installation",
                 "SLACK_STATE_GOOGLE_BUCKET_NAME": "multi-reaction-add-oauthstate",
@@ -173,5 +191,3 @@ Then press `F5` to start debugging.
 ## More
 
 More info about how to setup a local environment can be found [here](https://slack.dev/bolt-python/tutorial/getting-started), and documentation about the Slack Bolt for Python APIs can be found [here](https://slack.dev/bolt-python/concepts).
-
-Whenever you change how the interraction with Slack API is made, don't forget to check out the [Slack API Tier limits](https://api.slack.com/docs/rate-limits) (the various api calls/minute rates) and set pauses in the app accordingly, otherwise Slack will return a `HTTP 429 Too Many Requests`.

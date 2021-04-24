@@ -1,0 +1,8 @@
+.vscode
+__pycache__
+*key.json
+docs
+*.yaml
+.git
+.gitignore
+README.md
