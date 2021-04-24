@@ -3,16 +3,18 @@ import os
 import re
 import threading
 from pathlib import Path
-# from asyncio import sleep
+# from time import sleep
 
-from slack_bolt.async_app import AsyncApp
-from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
+from slack_bolt.app import App
+from slack_bolt.oauth.oauth_settings import OAuthSettings
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
+from slack_bolt.adapter.flask import SlackRequestHandler # https://slack.dev/bolt-python/concepts#adapters
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
 
 from google.cloud.storage import Client
+from flask import Flask, request
 
 
 logging.basicConfig(level=os.environ.get('LOG_LEVEL', 'INFO'))
@@ -26,10 +28,9 @@ storage_client = Client()
 BUCKET = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])
 
 # Initialize the app with the OAuth configuration
-# TODO: asyncio app
-app = AsyncApp(
+app = App(
     signing_secret=os.environ["SLACK_SIGNING_SECRET"],
-    oauth_settings=AsyncOAuthSettings(
+    oauth_settings=OAuthSettings(
         client_id=os.environ["SLACK_CLIENT_ID"],
         client_secret=os.environ["SLACK_CLIENT_SECRET"],
         scopes=["commands", "emoji:read"], # scopes needed for bot operations
@@ -47,8 +48,41 @@ app = AsyncApp(
     )
 )
 
+flask_app = Flask(__name__)
+handler = SlackRequestHandler(app)
 
-async def _get_reactions_in_team(client):
+
+@flask_app.route("/slack/events", methods=["POST"])
+def slack_events():
+    """Handles /slack/events which are all incoming slack API calls made by users
+
+    Returns:
+        Response: a Flask response for the event triggered by the user
+    """
+    return handler.handle(request)
+
+
+@flask_app.route("/slack/install", methods=["GET"])
+def slack_install():
+    """Handles /slack/install and starts Slack OAuth flow (i.e. user installs the app)
+
+    Returns:
+        Response: a Flask response containing a payload to request app authorization for a user
+    """
+    return handler.handle(request)
+
+
+@flask_app.route("/slack/oauth_redirect", methods=["GET"])
+def slack_oauth_redirect():
+    """Handles /slack/oauth_redirect to save the user OAuth credentials after app usage has been authorized
+
+    Returns:
+        Response: a Flask response to redirect the user to Slack after user authorized the app usage
+    """
+    return handler.handle(request)
+
+
+def _get_reactions_in_team(client):
     """Gets the emojis available in a workspace
 
     Args:
@@ -58,7 +92,7 @@ async def _get_reactions_in_team(client):
         list: list of strings with all emojis
     """
     try:
-        response = await client.emoji_list(include_categories=True)
+        response = client.emoji_list(include_categories=True)
     finally:
         # sleep(TIER2_LIMIT_SEC)
         pass
@@ -68,7 +102,7 @@ async def _get_reactions_in_team(client):
     return custom_emojis + builtin_emojis
 
 
-async def _get_valid_reactions(text, client):
+def _get_valid_reactions(text, client):
     """Returns the valid emojis available in user's workspace, if any
 
     Args:
@@ -84,7 +118,7 @@ async def _get_valid_reactions(text, client):
         return []
 
     reactions = [r[1:-1] for r in reactions] # strip the colons
-    all_reactions = await _get_reactions_in_team(client)
+    all_reactions = _get_reactions_in_team(client)
     return [r for r in reactions if r in all_reactions]
 
 
@@ -101,7 +135,7 @@ def _get_rendered_reactions(reactions):
 
 
 @app.command("/multireact") # https://api.slack.com/interactivity/slash-commands, https://slack.dev/bolt-python/concepts#commands 
-async def save_or_display_reactions(ack, client, command, respond, logger):
+def save_or_display_reactions(ack, client, command, respond, logger):
     # TODO: move methods contents to dedicated file in package
     """Handler for slack command:
       "/multireact"      - display reactions for curent user, or inform that none is set
@@ -119,35 +153,35 @@ async def save_or_display_reactions(ack, client, command, respond, logger):
          IOError: whenever user data cannot be read or saved
          OSError: whenever user data cannot be read or saved
     """
-    await ack() # commands must be acknowledged with ack() to inform Slack your app has received the event.
+    ack() # commands must be acknowledged with ack() to inform Slack your app has received the event.
     # sample command
     # {'token': 'MKxqqxT4PQMBnyNJdjAocKOF', 'team_id': 'T01S9QDF7AT', 'team_domain': 'ccc-yzo4468', 'channel_id': 'D01T36EUQTT', 'channel_name': 'directmessage', 'user_id': 'U01SWNKJR6G', 'user_name': 'user.name', 'command': '/multireact', 'text': ':+1::raised_hands::eyes::clap::large_blue_circle::100::heart:', 'api_app_id': 'A01S9QL1VAT', 'is_enterprise_install': 'false', 'response_url': 'https://hooks.slack.com/commands/T01S9QDF7AT/1910458772038/JZenAWWRrsPnTqV8QtqZ5Un0', 'trigger_id': '1917238991026.1893829517367.a413f69683ea053e0791c739a29a6da4'}
     user_id = command["user_id"]
     blob = BUCKET.blob(user_id)
 
     if "text" in command: # this command has some text in it => will save new reactions
-        reactions = await _get_valid_reactions(command["text"], client) # sanitize the mesage from user and select only reactions
+        reactions = _get_valid_reactions(command["text"], client) # sanitize the mesage from user and select only reactions
         # sleep was handled in _get_valid_reactions
         if len(reactions) > 23: # inform user when reaction limit reached: https://slack.com/intl/en-se/help/articles/206870317-Use-emoji-reactions
-            await respond(("Slow down! You tried to save more than 23 reactions :racing_car:\nTry using less reactions this time :checkered_flag:"))
+            respond(("Slow down! You tried to save more than 23 reactions :racing_car:\nTry using less reactions this time :checkered_flag:"))
             logger.info(f"User {user_id} tried to add >23 reactions")
 
         elif len(reactions) == 0: # no reactions found in the given text
-            await respond(("Oh no! You did not provide any valid reactions :open_mouth:\nMake sure you type the reactions starting with `:`,"
+            respond(("Oh no! You did not provide any valid reactions :open_mouth:\nMake sure you type the reactions starting with `:`,"
                     " or use the Emoji button (:slightly_smiling_face:) to add one."))
             logger.info(f"User {user_id} set no valid reactions")
 
         else: # valid reactions were given to be saved
             reactions = " ".join(reactions)
             blob.upload_from_string(reactions)
-            await respond("Great! Your new reactions are saved :sunglasses: Type `/multireact` to see them at any time.")
+            respond("Great! Your new reactions are saved :sunglasses: Type `/multireact` to see them at any time.")
             logger.info(f"User {user_id} saved {reactions}")
 
     else: # otherwise, report to user any reactions they have
         if blob.exists(): # display any reactions the user has saved
             reactions = blob.download_as_text(encoding="utf-8")
             try:
-                await respond(f"Your current reactions are: {_get_rendered_reactions(reactions)}. Type `/multireact <new list of emojis>` to change them.")
+                respond(f"Your current reactions are: {_get_rendered_reactions(reactions)}. Type `/multireact <new list of emojis>` to change them.")
                 logger.info(f"User {user_id} loaded {reactions}")
             finally:
                 # sleep(TIER4_LIMIT_SEC)
@@ -155,7 +189,7 @@ async def save_or_display_reactions(ack, client, command, respond, logger):
 
         else: # or say that user doesn't have any
             try:
-                await respond("You do not have any reactions set :anguished:\nType `/multireact <list of emojis>` to set one.")
+                respond("You do not have any reactions set :anguished:\nType `/multireact <list of emojis>` to set one.")
                 logger.info(f"User {user_id} has no reactions")
             finally:
                 # sleep(TIER4_LIMIT_SEC)
@@ -163,7 +197,7 @@ async def save_or_display_reactions(ack, client, command, respond, logger):
 
 
 @app.shortcut("add_reactions")
-async def add_reactions(ack, shortcut, client, logger, context):
+def add_reactions(ack, shortcut, client, logger, context):
     """Handler for message shortcut functionality where the user adds the recorded reactions to the message mentioned in the shortcut activity
 
     Args:
@@ -178,7 +212,7 @@ async def add_reactions(ack, shortcut, client, logger, context):
          IOError: whenever user data cannot be read or saved
          OSError: whenever user data cannot be read or saved
     """
-    await ack() # commands must be acknowledged with ack() to inform Slack your app has received the event.
+    ack() # commands must be acknowledged with ack() to inform Slack your app has received the event.
     # sample shortcut
     # {'type': 'message_action', 'token': 'MKxqqxT4PQMBnyNJdjAocKOF', 'action_ts': '1617307130.812650', 'team': {'id': 'T01S9QDF7AT', 'domain': 'ccc-yzo4468'}, 'user': {'id': 'U01SWNKJR6G', 'username': 'user.name', 'team_id': 'T01S9QDF7AT', 'name': 'User Name'}, 'channel': {'id': 'C01S9QDFYNT', 'name': 'general'}, 'is_enterprise_install': False, 'enterprise': None, 'callback_id': 'add_reactions', 'trigger_id': '1921893944962.1893829517367.a00ca10cfbff650e5eda3e6a446fbc18', 'response_url': 'https://hooks.slack.com/app/T01S9QDF7AT/1918813724821/CTVMTDtdahKL9Vdrbee00sZG', 'message_ts': '1617307089.003400', 'message': {'client_msg_id': '6f9e6469-14ed-4bf8-8dee-7170b17af92b', 'type': 'message', 'text': 'asdfghjkl', 'user': 'U01SWNKJR6G', 'ts': '1617307089.003400', 'team': 'T01S9QDF7AT', 'blocks': [{'type': 'rich_text', 'block_id': 'm3V', 'elements': [{'type': 'rich_text_section', 'elements': [{'type': 'text', 'text': 'asdfghjkl'}]}]}]}}
     user_id = shortcut["user"]["id"]
@@ -195,7 +229,7 @@ async def add_reactions(ack, shortcut, client, logger, context):
                 client.token = context.user_token # alter context to post on users's behalf: https://slack.dev/java-slack-sdk/guides/bolt-basics#use-web-apis--reply-using-say-utility
                 try:
                     # TODO: read reactions first, do a diff and react with the remaining emojis
-                    await client.reactions_add(
+                    client.reactions_add(
                         channel=channel_id,
                         timestamp=message_ts,
                         name=reaction
@@ -211,7 +245,7 @@ async def add_reactions(ack, shortcut, client, logger, context):
 
     else: # if user set no reactions, display a dialogue to inform the user that no reactions are set
         try:
-            await client.views_open(
+            client.views_open(
                 trigger_id=shortcut["trigger_id"],
                 view={
                     "type": "modal",

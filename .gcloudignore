@@ -1,7 +1,0 @@
-.vscode
-__pycache__
-docs
-.git
-.gitignore
-README.md
-*key.json

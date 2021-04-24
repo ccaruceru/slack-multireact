@@ -40,9 +40,9 @@ gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-installation
 
 ## Service account
 
-Create a service account that the function will use to access the GCS buckets.
+Create a service account the container will use to access the GCS buckets.
 ```bash
-gcloud iam service-accounts create sa-multireact-slack-app --description="SVC account for running Google cloud functions for multireact slack app" --display-name="SA Multireact Slack App"
+gcloud iam service-accounts create sa-multireact-slack-app --description="SVC account for running a service in Cloud Run for multireact slack app" --display-name="SA Multireact Slack App"
 ```
 Get the service account full name:
 ```bash
@@ -60,7 +60,7 @@ gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-d
 ## Create Slack application
 
 ### Interactivity & Shortcuts
-- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
 - **Create New Shortcut**
     - with **On messages** type
     - that has the Callback ID named `add_reactions`
@@ -69,11 +69,11 @@ gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-d
 ### Slash commands
 - **Create New Command**
     - Command is `/multireact`
-    - Request URL is `<bot address>/slack/events` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+    - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
 <img src="docs/create-command.png" alt="create-command" width="500"/>
 
 ### OAuth & Permissions
-- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Function has been deployed - see [Google Cloud Function](#google-cloud-function) section_)
+- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
 - **Scopes**
     - **Bot Token Scopes**: Add and OAuth scope for `commands` (might be already added)
 <img src="docs/add-scopes.png" alt="add-scope" width="500"/>
@@ -86,13 +86,14 @@ Add relevant description under **Display Information**
 
 ## Environment variables
 
-Environment variables for the Google Cloud Function are set in [.env.yaml](.env.yaml) file. Mandatory variables from the app's **Basic Information** page:
+Mandatory environment variables for the Cloud Run Service are taken from the app's **Basic Information** page:
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 <img src="docs/app-credentials.png" alt="app-credentials" width="500"/>
 
-Along with Google Cloud Storage bucket names:
+Along with other Google Cloud variables:
+- CPUS: max number of cpus assigned for the container
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user
 - SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state
 - USER_DATA_BUCKET_NAME: bucket for user emoji data
@@ -117,14 +118,14 @@ Deploy the container to Google Cloud Run using the following command:
 gcloud run deploy multireact-slack-app\
  --image eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app\
  --platform managed\ # Fully managed version of Cloud Run
- --cpu=1\ # CPU limit
+ --cpu=2\ # CPU limit
  --memory=512Mi\ # memory limit
- --min-instances=2\ # min instances
+ --min-instances=1\ # min instances
  --max-instances=20\ # max instances
  --region=europe-west1\
  --port=3000\ # container port
  --service-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com\
- --set-env-vars=SLACK_CLIENT_ID=<client id>,SLACK_CLIENT_SECRET=<client secret>,SLACK_SIGNING_SECRET=<signing secret>,SLACK_INSTALLATION_GOOGLE_BUCKET_NAME=multi-reaction-add-installation,SLACK_STATE_GOOGLE_BUCKET_NAME=multi-reaction-add-oauthstate,USER_DATA_BUCKET_NAME=multi-reaction-add-userdata\ # env vars
+ --update-env-vars=SLACK_CLIENT_ID=<client id>,SLACK_CLIENT_SECRET=<client secret>,SLACK_SIGNING_SECRET=<signing secret>,CPUS=2,SLACK_INSTALLATION_GOOGLE_BUCKET_NAME=multi-reaction-add-installation,SLACK_STATE_GOOGLE_BUCKET_NAME=multi-reaction-add-oauthstate,USER_DATA_BUCKET_NAME=multi-reaction-add-userdata\ # env vars
  --allow-unauthenticated # make service publicly accessible
 ```
 
