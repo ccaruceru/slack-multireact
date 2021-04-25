@@ -1,9 +1,10 @@
 import os
 import logging
 from multi_reaction_add import app
+from aiohttp import web
 
 
-async def entrypoint():
+async def entrypoint() -> web.Application:
     """Handler for Gunicorn server
 
     Returns:
@@ -21,5 +22,4 @@ if __name__ == "__main__":
 
 # TODO: handle token revoked and app uninstalled events: https://gist.github.com/seratch/d81a445ef4467b16f047156bf859cda8#file-main-py-L50-L65
 # TODO: update docs
-# TODO: add arg types and return type
 # TODO: emoji update thread?...

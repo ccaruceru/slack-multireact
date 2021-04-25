@@ -1,7 +1,9 @@
 import re
+from typing import List
+from slack_sdk.web.async_client import AsyncWebClient
 
 
-async def get_user_reactions(client, channel_id, message_ts, user_id):
+async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts: str, user_id: str) -> List[str]:
     """Gets reactions made by current user to an item (file, file comment, channel message, group message, or direct message)
 
     Args:
@@ -29,7 +31,7 @@ async def get_user_reactions(client, channel_id, message_ts, user_id):
     return []
 
 
-async def _get_reactions_in_team(client):
+async def _get_reactions_in_team(client: AsyncWebClient) -> List[str]:
     """Gets the emojis available in a workspace
 
     Args:
@@ -45,7 +47,7 @@ async def _get_reactions_in_team(client):
     return custom_emojis + builtin_emojis
 
 
-async def get_valid_reactions(text, client):
+async def get_valid_reactions(text: str, client: AsyncWebClient) -> List[str]:
     """Returns the valid emojis available in user's workspace, if any
 
     Args:

@@ -2,6 +2,10 @@ import os
 import logging
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
+from slack_bolt.context.ack.async_ack import AsyncAck
+from slack_bolt.context.respond.async_respond import AsyncRespond
+from slack_bolt.context.async_context import AsyncBoltContext
+from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
@@ -38,7 +42,7 @@ app = AsyncApp(
 
 
 @app.command("/multireact") # https://api.slack.com/interactivity/slash-commands, https://slack.dev/bolt-python/concepts#commands 
-async def save_or_display_reactions(ack, client, command, respond, logger):
+async def save_or_display_reactions(ack: AsyncAck, client: AsyncWebClient, command: dict, respond: AsyncRespond, logger: logging.Logger) -> None:
     """Handler for slack command:
       "/multireact"      - display reactions for curent user, or inform that none is set
       "/multireact text" - set reactions for current user
@@ -98,7 +102,7 @@ async def save_or_display_reactions(ack, client, command, respond, logger):
 
 
 @app.shortcut("add_reactions")
-async def add_reactions(ack, shortcut, client, logger, context):
+async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, logger: logging.Logger, context: AsyncBoltContext) -> None:
     """Handler for message shortcut functionality where the user adds the recorded reactions to the message mentioned in the shortcut activity
 
     Args:
