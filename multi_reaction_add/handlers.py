@@ -6,7 +6,7 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
-from multi_reaction_add.internals import get_valid_reactions
+from multi_reaction_add.internals import get_valid_reactions, get_user_reactions
 from google.cloud.storage import Client
 
 
@@ -22,7 +22,7 @@ app = AsyncApp(
         client_id=slack_client_id,
         client_secret=os.environ["SLACK_CLIENT_SECRET"],
         scopes=["commands", "emoji:read"], # scopes needed for bot operations
-        user_scopes=["reactions:write"], # scopes needed for operations on behalf of user
+        user_scopes=["reactions:read", "reactions:write"], # scopes needed for operations on behalf of user
         installation_store=GoogleCloudStorageInstallationStore(
             storage_client=storage_client,
             bucket_name=os.environ["SLACK_INSTALLATION_GOOGLE_BUCKET_NAME"],
@@ -132,21 +132,17 @@ async def add_reactions(ack, shortcut, client, logger, context):
         reactions = blob.download_as_text(encoding="utf-8")
 
     if reactions: # if user has any reactions saved, add them to the message
-        for reaction in reactions.split(" "): # saved as a whitespace separated string
-            try:
-                client.token = context.user_token # alter context to post on users's behalf: https://slack.dev/java-slack-sdk/guides/bolt-basics#use-web-apis--reply-using-say-utility
-                # TODO: read reactions first, do a diff and react with the remaining emojis
-                await client.reactions_add(
-                    channel=channel_id,
-                    timestamp=message_ts,
-                    name=reaction
-                )
-                logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
-
-            except SlackApiError as err: # if the error message says the user already reacted then ignore it
-                # TODO: slack_sdk.errors.SlackApiError: The request to the Slack API failed. The server responded with: {'ok': False, 'error': 'already_reacted'}
-                if not (type(err.response) is SlackResponse and "error" in err.response.data and err.response.data["error"] == "already_reacted"):
-                    raise err
+        reactions = reactions.split(" ") # was saved as space separated string
+        client.token = context.user_token # alter context to post on users's behalf: https://slack.dev/java-slack-sdk/guides/bolt-basics#use-web-apis--reply-using-say-utility
+        used_reactions = await get_user_reactions(client, channel_id, message_ts, user_id) # get user reactions on message
+        to_react = list(set(reactions) - set(used_reactions)) # compute list of remaining reactions
+        for reaction in to_react:
+            await client.reactions_add(
+                channel=channel_id,
+                timestamp=message_ts,
+                name=reaction
+            )
+            logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
 
     else: # if user set no reactions, display a dialogue to inform the user that no reactions are set
         await client.views_open(

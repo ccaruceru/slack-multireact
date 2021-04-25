@@ -1,6 +1,34 @@
 import re
 
 
+async def get_user_reactions(client, channel_id, message_ts, user_id):
+    """Gets reactions made by current user to an item (file, file comment, channel message, group message, or direct message)
+
+    Args:
+        client (WebClient): an initialzied slack web client to communicate with slack API
+        message_ts (str): timestamp of the item/message
+        user_id (str): user id to filter out reactions
+
+    Returns:
+        list: list of str with reactions made by the user. otherwise an empty list
+    """
+    response = await client.reactions_get(channel=channel_id, timestamp=message_ts) # gets all reactions on a message
+    # handle all possible response types: https://api.slack.com/methods/reactions.get
+    if response["type"] == "message":
+        if "reactions" in response["message"]:
+            return [r["name"] for r in response["message"]["reactions"] if user_id in r["users"]]
+
+    elif response["type"] == "file":
+        if "reactions" in response["file"]:
+            return [r["name"] for r in response["file"]["reactions"] if user_id in r["users"]]
+
+    elif response["type"] == "file_comment":
+        if "reactions" in response["comment"]:
+            return [r["name"] for r in response["comment"]["reactions"] if user_id in r["users"]]
+
+    return []
+
+
 async def _get_reactions_in_team(client):
     """Gets the emojis available in a workspace
 
@@ -11,7 +39,6 @@ async def _get_reactions_in_team(client):
         list: list of strings with all emojis
     """
     response = await client.emoji_list(include_categories=True)
-
     custom_emojis = list(response["emoji"].keys())
     builtin_emojis = [emj for cat in response["categories"] for emj in cat["emoji_names"]]
     # TODO: handle thumbsup: https://king.slack.com/help/requests/3477073
