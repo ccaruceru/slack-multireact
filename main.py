@@ -3,9 +3,6 @@ import logging
 from multi_reaction_add import app
 
 
-logging.basicConfig(level=os.environ.get('LOG_LEVEL', 'INFO'))
-
-
 async def entrypoint():
     """Handler for Gunicorn server
 

@@ -1,4 +1,5 @@
 import os
+import logging
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk.errors import SlackApiError
@@ -9,6 +10,7 @@ from multi_reaction_add.internals import get_valid_reactions
 from google.cloud.storage import Client
 
 
+logging.basicConfig(level=os.environ.get('LOG_LEVEL', 'INFO'))
 # initialize the Google Storage client
 storage_client = Client()
 bucket = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])

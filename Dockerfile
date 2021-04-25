@@ -2,7 +2,6 @@ FROM python:3.8.3-alpine3.12
 
 ENV PORT=3000
 ENV LOG_LEVEL=INFO
-ENV ENVIRONMENT=production
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED=True
 ENV CPUS=1
