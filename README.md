@@ -119,7 +119,7 @@ gcloud run deploy multireact-slack-app\
  --image eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app\
  --platform managed\ # Fully managed version of Cloud Run
  --cpu=2\ # CPU limit
- --memory=512Mi\ # memory limit
+ --memory=256Mi\ # memory limit
  --min-instances=1\ # min instances
  --max-instances=20\ # max instances
  --region=europe-west1\
@@ -190,5 +190,7 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
 Then press `F5` to start debugging.
 
 ## More
+
+The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is spawning threads with [aiohttp](https://docs.aiohttp.org/en/stable/), which work on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html) . The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
 
 More info about how to setup a local environment can be found [here](https://slack.dev/bolt-python/tutorial/getting-started), and documentation about the Slack Bolt for Python APIs can be found [here](https://slack.dev/bolt-python/concepts).
