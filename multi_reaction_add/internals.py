@@ -1,9 +1,15 @@
 import re
+import asyncio
 import logging
 import json
 from typing import List
 from aiohttp import ClientSession, ClientConnectorError, ClientResponseError
+from slack_bolt.async_app import AsyncApp
+from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+
+# list of all emojis available in this team
+ALL_EMOJIS = []
 
 
 async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts: str, user_id: str) -> List[str]:
@@ -34,6 +40,29 @@ async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts
     return []
 
 
+async def _update_emoji_list(app: AsyncApp, token: str, logger: logging.Logger) -> None:
+    """Updates the global emojis list with latest from slack api
+
+    Args:
+        app (AsyncApp): Bolt application instance
+        token (str): bot token to make api calls
+        logger (logging.Logger): logger for printing messages
+    """
+    global ALL_EMOJIS
+
+    while True:
+        await asyncio.sleep(60) # 1 min
+        try:
+            logging.info("Start emoji update")
+            old_token = app.client.token
+            app.client.token = token
+            ALL_EMOJIS = await _get_reactions_in_team(app.client, logger)
+            app.client.token = old_token
+            logging.info("Emoji update finished")
+        except SlackApiError:
+            logging.exception("Failed to update emoji list")
+
+
 async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger) -> List[str]:
     """Gets the custom emojis available in a workspace plus the standard available ones
     https://king.slack.com/help/requests/3477073
@@ -59,23 +88,26 @@ async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger)
                 else:
                     logger.warning(f"Could not retrieve standard emojis: {resp.status} {resp.reason}")
 
-        except (ClientConnectorError, ClientResponseError) as e:
-            logger.warning(f"Could not retrieve standard emojis: {e}")
+        except (ClientConnectorError, ClientResponseError):
+            logger.exception("Failed to get standard emojis")
 
     return list(set(custom_emojis + builtin_emojis + standard_emojis))
 
 
-async def get_valid_reactions(text: str, client: AsyncWebClient, logger: logging.Logger) -> List[str]:
+async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, logger: logging.Logger) -> List[str]:
     """Returns the valid emojis available in user's workspace, if any
 
     Args:
         text (str): message from the user which contains possible emojis
         client (WebClient): an initialized slack WebClient for API calls
+        app (AsyncApp): the Bolt application instance
         logger (Logger): a logger to print information
 
     Returns:
         list: a list of strings containing valid emojis from user
     """
+    global ALL_EMOJIS
+
     reactions = re.findall(r":[a-z0-9-_\+']+(?:::[a-z0-9-_\+']+){0,1}:", text) # find all :emoji: and :thumbsup::skin-tone-2: strings
     reactions = list(dict.fromkeys(reactions)) # remove duplicates and keep original positions
     if not reactions:
@@ -88,7 +120,11 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, logger: logging
     for r in reactions:
         reactions_with_modifier.append(r) if "::" in r else simple_reactions.append(r)
 
-    all_reactions = await _get_reactions_in_team(client, logger)
-    valid_reactions =  [r for r in simple_reactions        if r                in all_reactions]
-    valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in all_reactions]
+    if not ALL_EMOJIS:
+        ALL_EMOJIS = await _get_reactions_in_team(client, logger)
+        # start a thread to update all emojis for future use
+        asyncio.create_task(coro=_update_emoji_list(app, client.token, logger), name="EmojiUpdate")
+
+    valid_reactions =  [r for r in simple_reactions        if r                in ALL_EMOJIS]
+    valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in ALL_EMOJIS]
     return [r for r in orig_reactions if r in valid_reactions] # return reactions back in order
