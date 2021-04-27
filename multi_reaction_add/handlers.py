@@ -73,7 +73,7 @@ async def save_or_display_reactions(ack: AsyncAck, client: AsyncWebClient, comma
     blob = bucket.blob(f"{slack_client_id}/{enterprise_id}-{team_id}/{user_id}")
 
     if "text" in command: # this command has some text in it => will save new reactions
-        reactions = await get_valid_reactions(command["text"], client) # sanitize the mesage from user and select only reactions
+        reactions = await get_valid_reactions(command["text"], client, logger) # sanitize the mesage from user and select only reactions
         if len(reactions) > 23: # inform user when reaction limit reached: https://slack.com/intl/en-se/help/articles/206870317-Use-emoji-reactions
             await respond(("Slow down! You tried to save more than 23 reactions :racing_car:\nTry using less reactions this time :checkered_flag:"))
             logger.info(f"User {user_id} tried to add >23 reactions")
