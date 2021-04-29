@@ -25,6 +25,8 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
 
 The deployment process consists in creating two Google Cloud components: A Google Cloud Run [Service](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/python) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
 
+The cloud platform must follow [King's Acceptable Use Policies](https://docs.google.com/document/d/1slOyRUquX3OSIh9uKcWQj68HwQ6czUkRMTtqV2SO9B4/edit#heading=h.j9uihjbnbt87).
+
 ## Google Storage buckets
 
 The application requires 3 GCS buckets to store temporary data for the oauth process, app installation data for each user and another bucket for user emoji data.
@@ -38,16 +40,24 @@ gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-oauthstate
 gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-installation
 ```
 
+Optional: set a retention policy of 1 day for the bucket that will be used for temporary OAuth tokens:
+
+```bash
+gsutil lifecycle set oauth-bucket-lifecycle.json gs://multi-reaction-add-oauthstate
+```
+
 ## Service account
 
-Create a service account the container will use to access the GCS buckets.
+A service account must be assigned to the container to access the GCS buckets.
 ```bash
 gcloud iam service-accounts create sa-multireact-slack-app --description="SVC account for running a service in Cloud Run for multireact slack app" --display-name="SA Multireact Slack App"
 ```
+
 Get the service account full name:
 ```bash
 gcloud iam service-accounts list
 ```
+
 Grant permissions for each bucket:
 ```bash
 gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
@@ -93,7 +103,7 @@ Mandatory environment variables for the Cloud Run Service are taken from the app
 <img src="docs/app-credentials.png" alt="app-credentials" width="500"/>
 
 Along with other Google Cloud variables:
-- CPUS: max number of cpus assigned for the container
+- CPUS: max number of cpus assigned for the container (must be an integer)
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user
 - SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state
 - USER_DATA_BUCKET_NAME: bucket for user emoji data
@@ -107,8 +117,8 @@ Optional:
 Build the image and deploy it to [Google Cloud Registry](https://cloud.google.com/container-registry):
 
 ```bash
-# gcloud auth login # login to the gcp project
-# gcloud auth configure-docker # setup docker credentials for gcr
+# login to the gcp project with "gcloud auth login"
+# setup docker credentials for gcr with "gcloud auth configure-docker"
 docker build -t eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app .
 docker push eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app
 ```
@@ -130,8 +140,8 @@ gcloud run deploy multireact-slack-app\
 ```
 
 **Notes**
-- Google Cloud Run service must be enabled for the project
-- `--allow-unauthenticated` flag implies that the user who deploys the container has either **Owner** or **Cloud Run Admin** role in order to assing `roles/run.invoker` to `allUsers` for the deployed service, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_
+- Google Cloud Run service must be enabled for the project.
+- `--allow-unauthenticated` flag implies that the user who deploys the container has either **Owner** or **Cloud Run Admin** role in order to assing `roles/run.invoker` to `allUsers` for the deployed service, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_, and the service will fail to be exposed.
 
 Describe the running container to get the HTTPS endpoint:
 ```bash
@@ -143,11 +153,11 @@ To start development for this app install **Python 3.8**, [ngrok](https://ngrok.
 - `pip install -r requirements.txt`
 - in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
     - **note**: sometimes the VPN client will prevent ngrok from establishing a connection
-- setup a slack application according to [Create Slack application](#create-slack-application) section, using ngrok's _ngrok generated https address_
-    - when running the application locally, the HTTP endpoints created by Bolt framework are:
+- setup a slack application according to [Create Slack application](#create-slack-application) section, using _ngrok generated https address_
+    - the HTTP endpoints created by Bolt framework are:
         - **/slack/events** - used as _Request URL_ for incoming slack API requests (commands and shortcuts)
         - **/slack/install** - simple interface which allows a user to install the app to a workspace and start the OAuth flow
-        - **/slack/oauth_redirect** - endpoint used by Slack to complete the OAuth flow (the _Redirect URL_ under [OAuth & Permissions](#oauth-&-Permissions) section)
+        - **/slack/oauth_redirect** - endpoint used by Slack to complete the OAuth flow (the _Redirect URL_ under [OAuth & Permissions](#oauth-&-permissions) section)
 - create GCS buckets described in [Google Storage buckets](#google-storage-buckets)
 - create a service account similar to [Service account](#service-account) and generate a key for the account:
 ```bash
@@ -191,6 +201,6 @@ Then press `F5` to start debugging.
 
 ## More
 
-The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is spawning threads with [aiohttp](https://docs.aiohttp.org/en/stable/), which work on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html) . The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
+The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is handling requests with [aiohttp](https://docs.aiohttp.org/en/stable/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html) . The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
 
-More info about how to setup a local environment can be found [here](https://slack.dev/bolt-python/tutorial/getting-started), and documentation about the Slack Bolt for Python APIs can be found [here](https://slack.dev/bolt-python/concepts).
+More info about how to setup a local environment can be found [here](https://slack.dev/bolt-python/tutorial/getting-started), documentation about the Slack Bolt for Python APIs can be found [here](https://slack.dev/bolt-python/concepts), and more examples on how to use the Bolt framework can be found [here](https://github.com/slackapi/bolt-python/tree/main/examples).

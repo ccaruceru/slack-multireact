@@ -17,6 +17,7 @@ async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts
 
     Args:
         client (WebClient): an initialzied slack web client to communicate with slack API
+        channel_id (str): channel id of the item/message
         message_ts (str): timestamp of the item/message
         user_id (str): user id to filter out reactions
 

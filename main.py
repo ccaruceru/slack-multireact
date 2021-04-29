@@ -20,7 +20,6 @@ if __name__ == "__main__":
     logging.info(f"Listening on port {port}")
     app.start(port)
 
+
 # TODO: handle token revoked and app uninstalled events: https://gist.github.com/seratch/d81a445ef4467b16f047156bf859cda8#file-main-py-L50-L65
-# TODO: update docs
-# TODO: emoji update thread + sigterm handle (https://stackoverflow.com/a/41107971)
 # TODO: cloud run friendly logs: https://cloud.google.com/run/docs/logging#run_manual_logging-python
