@@ -1,12 +1,16 @@
+import os
 import re
 import asyncio
 import logging
 import json
+from collections import OrderedDict
 from typing import List
 from aiohttp import ClientSession, ClientConnectorError, ClientResponseError
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+from pythonjsonlogger import jsonlogger
+
 
 # list of all emojis available in this team
 ALL_EMOJIS = []
@@ -129,3 +133,29 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     valid_reactions =  [r for r in simple_reactions        if r                in ALL_EMOJIS]
     valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in ALL_EMOJIS]
     return [r for r in orig_reactions if r in valid_reactions] # return reactions back in order
+
+
+def setup_logger() -> None:
+    """Changes python logger to a json based one that's compatible with Cloud Run logs
+    """
+    logger = logging.getLogger()
+    logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
+    logHandler = logging.StreamHandler()
+    formatter = CloudRunJsonFormatter('%(timestamp)s %(severity)s %(funcName)s %(component)s %(message)s')
+    logHandler.setFormatter(formatter)
+    logger.addHandler(logHandler)
+
+
+class CloudRunJsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record: OrderedDict, record: logging.LogRecord, message_dict: dict) -> None:
+        """Override the super.add_fields to add an extra levelname required for Cloud logs
+
+        Args:
+            log_record (OrderedDict): Output log fields
+            record (logging.LogRecord): Original log entry
+            message_dict (dict): Additional information attached to the json log
+        """
+        super().add_fields(log_record, record, message_dict)
+        log_record['severity']  = record.levelname
+        log_record['component'] = record.name
+        log_record['timestamp'] = self.formatTime(record)

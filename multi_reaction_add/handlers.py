@@ -8,11 +8,12 @@ from slack_bolt.context.async_context import AsyncBoltContext
 from slack_sdk.web.async_client import AsyncWebClient
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
-from multi_reaction_add.internals import get_valid_reactions, get_user_reactions
+from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger
 from google.cloud.storage import Client
 
 
-logging.basicConfig(level=os.environ.get('LOG_LEVEL', 'INFO'))
+# setup json logging for google cloud
+setup_logger()
 # initialize the Google Storage client
 storage_client = Client()
 bucket = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])
