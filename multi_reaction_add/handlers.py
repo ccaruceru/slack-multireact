@@ -125,9 +125,11 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
 
     if reactions: # if user has any reactions saved, add them to the message
         reactions = reactions.split(" ") # was saved as space separated string
+        orig_reactions = reactions.copy() # keep list wth original positions
         client.token = context.user_token # alter context to post on users's behalf: https://slack.dev/java-slack-sdk/guides/bolt-basics#use-web-apis--reply-using-say-utility
         used_reactions = await get_user_reactions(client, channel_id, message_ts, user_id) # get user reactions on message
         to_react = list(set(reactions) - set(used_reactions)) # compute list of remaining reactions
+        to_react = [r for r in orig_reactions if r in to_react] # put reactions back in order
         for reaction in to_react:
             await client.reactions_add(
                 channel=channel_id,
