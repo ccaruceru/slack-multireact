@@ -164,3 +164,41 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
             }
         )
         logger.info(f"User {user_id} has no reactions")
+
+
+@app.event("tokens_revoked")
+async def handle_token_revocations(event: dict, context: AsyncBoltContext, logger: logging.Logger) -> None:
+    """Deletes the token given by the OAuth process when a user removes the app (i.e revokes the installation tokens)
+
+    Args:
+        event (dict): payload with user or bot ids
+        context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
+        logger (Logger): optional logger passed to all handlers
+    """
+    # TODO: stop emoji thread?
+    user_ids = event["tokens"].get("oauth")
+    if user_ids is not None and len(user_ids) > 0:
+        for user_id in user_ids:
+            await app.installation_store.async_delete_installation(
+                context.enterprise_id, context.team_id, user_id, context.is_enterprise_install
+            )
+            logger.info(f"Revoked user token for {user_id}")
+
+    bot_user_ids = event["tokens"].get("bot")
+    if bot_user_ids is not None and len(bot_user_ids) > 0:
+        await app.installation_store.async_delete_bot(context.enterprise_id, context.team_id,
+            context.is_enterprise_install
+        )
+        logger.info(f"Revoked bot token for {bot_user_ids}")
+
+
+@app.event("app_uninstalled")
+async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logger) -> None:
+    """Revokes all tokens for current slack application
+
+    Args:
+        context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
+        logger (Logger): optional logger passed to all handlers
+    """
+    await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
+    logger.info("All tokens were revoked.")

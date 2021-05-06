@@ -2,6 +2,7 @@
 # adaptation of from https://github.com/slackapi/python-slack-sdk/blob/main/slack_sdk/oauth/installation_store/amazon_s3/__init__.py
 #
 
+import asyncio
 import json
 import logging
 from logging import Logger
@@ -47,6 +48,9 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         none = "none"
         e_id = installation.enterprise_id or none
         t_id = installation.team_id or none
+        if installation.is_enterprise_install:
+            t_id = none
+
         workspace_path = f"{self.client_id}/{e_id}-{t_id}"
 
         if self.historical_data_enabled:
@@ -119,21 +123,20 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         team_id: Optional[str],
         is_enterprise_install: Optional[bool] = False,
     ) -> Optional[Bot]:
-        none = "none"
-        e_id = enterprise_id or none
-        t_id = team_id or none
-        if is_enterprise_install:
-            t_id = none
-        workspace_path = f"{self.client_id}/{e_id}-{t_id}"
+        key = self._bot_key(
+            enterprise_id=enterprise_id,
+            team_id=team_id,
+            is_enterprise_install=is_enterprise_install
+        )
         try:
             bucket = self.storage_client.bucket(self.bucket_name)
-            blob = bucket.blob(f"{workspace_path}/bot-latest")
+            blob = bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
             self.logger.debug(f"Downloaded {body} from Google bucket")
             data = json.loads(body)
             return Bot(**data)
         except Exception as e:  # skipcq: PYL-W0703
-            message = f"Failed to find bot installation data for enterprise: {e_id}, team: {t_id}: {e}"
+            message = f"Failed to find bot installation data for enterprise: {enterprise_id}, team: {team_id}: {e}"
             self.logger.warning(message)
             return None
 
@@ -160,18 +163,12 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         user_id: Optional[str] = None,
         is_enterprise_install: Optional[bool] = False,
     ) -> Optional[Installation]:
-        none = "none"
-        e_id = enterprise_id or none
-        t_id = team_id or none
-        if is_enterprise_install:
-            t_id = none
-        workspace_path = f"{self.client_id}/{e_id}-{t_id}"
+        key = self._installation_key(enterprise_id=enterprise_id,
+            team_id=team_id,
+            user_id=user_id,
+            is_enterprise_install=is_enterprise_install
+        )
         try:
-            key = (
-                f"{workspace_path}/installer-{user_id}-latest"
-                if user_id
-                else f"{workspace_path}/installer-latest"
-            )
             bucket = self.storage_client.bucket(self.bucket_name)
             blob = bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
@@ -179,6 +176,132 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             data = json.loads(body)
             return Installation(**data)
         except Exception as e:  # skipcq: PYL-W0703
-            message = f"Failed to find an installation data for enterprise: {e_id}, team: {t_id}: {e}"
+            message = f"Failed to find an installation data for enterprise: {enterprise_id}, team: {team_id}: {e}"
             self.logger.warning(message)
             return None
+
+#
+# adaptation of https://gist.github.com/seratch/d81a445ef4467b16f047156bf859cda8
+#
+
+    async def async_delete_installation(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        user_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ) -> None:
+        self.delete_installation(enterprise_id=enterprise_id,
+            team_id=team_id,
+            user_id=user_id,
+            is_enterprise_install=is_enterprise_install
+        )
+
+    def delete_installation(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        user_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ) -> None:
+        key = self._installation_key(enterprise_id=enterprise_id,
+            team_id=team_id,
+            user_id=user_id,
+            is_enterprise_install=is_enterprise_install
+        )
+        bucket = self.storage_client.bucket(self.bucket_name)
+        blob = bucket.blob(key)
+        if blob.exists():
+            blob.delete()
+            self.logger.debug(f"Uninstalled app for enterprise: {enterprise_id}, team: {team_id}, user: {user_id}")
+
+    async def async_delete_bot(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ) -> None:
+        self.delete_bot(enterprise_id=enterprise_id,
+            team_id=team_id,
+            is_enterprise_install=is_enterprise_install,
+        )
+
+    def delete_bot(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ) -> None:
+        key = self._bot_key(
+            enterprise_id=enterprise_id,
+            team_id=team_id,
+            is_enterprise_install=is_enterprise_install
+        )
+        bucket = self.storage_client.bucket(self.bucket_name)
+        blob = bucket.blob(key)
+        if blob.exists():
+            blob.delete()
+            self.logger.debug(f"Uninstalled bot for enterprise: {enterprise_id}, team: {team_id}")
+
+    async def async_delete_all(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ):
+        asyncio.gather(
+            self.async_delete_bot(enterprise_id=enterprise_id, team_id=team_id,
+                is_enterprise_install=is_enterprise_install
+            ),
+            self.async_delete_installation(
+                enterprise_id=enterprise_id, team_id=team_id, user_id=None,
+                is_enterprise_install=is_enterprise_install
+            )
+        )
+
+    def delete_all(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False,
+    ):
+        self.delete_bot(enterprise_id=enterprise_id, team_id=team_id,
+            is_enterprise_install=is_enterprise_install
+        )
+        self.delete_installation(enterprise_id=enterprise_id, team_id=team_id, user_id=None,
+            is_enterprise_install=is_enterprise_install
+        )
+
+    def _installation_key(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        user_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False
+    ) -> str:
+        none = "none"
+        e_id = enterprise_id or none
+        t_id = team_id or none
+        if is_enterprise_install:
+            t_id = none
+
+        workspace_path = f"{self.client_id}/{e_id}-{t_id}"
+        return (
+            f"{workspace_path}/installer-{user_id}-latest"
+            if user_id
+            else f"{workspace_path}/installer-latest"
+        )
+
+    def _bot_key(
+        self,
+        enterprise_id: Optional[str],
+        team_id: Optional[str],
+        is_enterprise_install: Optional[bool] = False
+    ) -> str:
+        none = "none"
+        e_id = enterprise_id or none
+        t_id = team_id or none
+        if is_enterprise_install:
+            t_id = none
+
+        return f"{self.client_id}/{e_id}-{t_id}/bot-latest"

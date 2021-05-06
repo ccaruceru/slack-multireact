@@ -88,6 +88,11 @@ gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-d
     - **Bot Token Scopes**: Add and OAuth scope for `commands` (might be already added)
 <img src="docs/add-scopes.png" alt="add-scope" width="500"/>
 
+### Event Subscriptions
+- add `<bot address>/slack/events` under _Request URL_
+- expand **Subscribe to bot events**, click on _Add Bot User Event_ and add `app_uninstalled` and `tokens_revoked` events
+<img src="docs/event-subscription.png" alt="event-subscription" width="500"/>
+
 ### App Home
 Disable all options
 
