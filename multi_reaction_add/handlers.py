@@ -132,12 +132,15 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
         to_react = list(set(reactions) - set(used_reactions)) # compute list of remaining reactions
         to_react = [r for r in orig_reactions if r in to_react] # put reactions back in order
         for reaction in to_react:
-            await client.reactions_add(
-                channel=channel_id,
-                timestamp=message_ts,
-                name=reaction
-            )
-            logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
+            try:
+                await client.reactions_add(
+                    channel=channel_id,
+                    timestamp=message_ts,
+                    name=reaction
+                )
+                logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
+            except:
+                logger.exception(f"Failed to add reaction {reaction} on message {message_ts} for user {user_id} from channel {channel_id}")
 
     else: # if user set no reactions, display a dialogue to inform the user that no reactions are set
         await client.views_open(

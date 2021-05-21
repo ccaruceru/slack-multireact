@@ -145,7 +145,8 @@ gcloud run deploy multireact-slack-app\
 ```
 
 **Notes**
-- Google Cloud Run service must be enabled for the project.
+- Google Cloud Run and Google Container Registry services must be enabled for the project:
+    - `gcloud services enable run.googleapis.com containerregistry.googleapis.com`
 - `--allow-unauthenticated` flag implies that the user who deploys the container has either **Owner** or **Cloud Run Admin** role in order to assing `roles/run.invoker` to `allUsers` for the deployed service, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_, and the service will fail to be exposed.
 
 Describe the running container to get the HTTPS endpoint:
