@@ -20,5 +20,5 @@ if __name__ == "__main__":
     logging.info(f"Listening on port {port}")
     app.start(port)
 
-# TODO: allow only skin tone modifiers + parse messages withouth any spaces
 # TODO: app home with instructions how to use the app
+# TODO: handle historical data deletion for installation

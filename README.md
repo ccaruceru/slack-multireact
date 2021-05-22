@@ -116,6 +116,38 @@ gcloud app browse --no-launch-browser --service=default
 gcloud app browse --no-launch-browser --service=sandbox
 ```
 
+### Cleanup old services
+Google App Engine is versioning each application by default and creates an endpoint for each version, then all the traffic is routed to the latest deployed service (unless specified otherwise) ([docs](https://cloud.google.com/appengine/docs/standard/python3/an-overview-of-app-engine)).
+
+List all running versions:
+```bash
+gcloud app versions list
+```
+
+e.g. output
+```text
+SERVICE  VERSION.ID       TRAFFIC_SPLIT  LAST_DEPLOYED              SERVING_STATUS
+default  20210521t201306  0.00           2021-05-21T20:14:28+02:00  SERVING
+default  20210521t203524  0.00           2021-05-21T20:36:35+02:00  SERVING
+default  20210521t204813  0.00           2021-05-21T20:49:12+02:00  SERVING
+default  20210521t210402  1.00           2021-05-21T21:04:58+02:00  SERVING
+sandbox  20210521t201306  0.00           2021-05-21T20:15:51+02:00  SERVING
+sandbox  20210521t203524  0.00           2021-05-21T20:37:49+02:00  SERVING
+sandbox  20210521t204813  0.00           2021-05-21T20:50:18+02:00  SERVING
+sandbox  20210521t210402  1.00           2021-05-21T21:06:18+02:00  SERVING
+```
+
+The versions where the `TRAFFIC_SPLIT` is 1 represent the latest deployed application. It is safe to delete the ones where `TRAFFIC_SPLIT` is 0.
+
+```bash
+gcloud app versions delete <version>
+```
+
+One liner to delete all versions where `TRAFFIC_SPLIT` is 0:
+```bash
+gcloud app versions delete $(gcloud app versions list --filter=TRAFFIC_SPLIT=0 --format="value(version.id)" | sort -u | tr '\n' ' ') --quiet
+```
+
 ### Troubleshooting
 _Problem_: `gcloud app deploy` fails with the following error:
 ```text

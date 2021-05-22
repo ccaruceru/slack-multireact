@@ -113,7 +113,7 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     """
     global ALL_EMOJIS
 
-    reactions = re.findall(r":[a-z0-9-_\+']+(?:::[a-z0-9-_\+']+){0,1}:", text) # find all :emoji: and :thumbsup::skin-tone-2: strings
+    reactions = re.findall(r":[a-z0-9-_\+']+(?:::skin\-tone\-\d+)?:", text) # find all :emoji: and :thumbsup::skin-tone-2: strings
     reactions = list(dict.fromkeys(reactions)) # remove duplicates and keep original positions
     if not reactions:
         return []
