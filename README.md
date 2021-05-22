@@ -23,7 +23,7 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
 
 # Google Cloud deployment
 
-The deployment process consists in creating two Google Cloud components: A Google Cloud Run [Service](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/python) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
+The deployment process consists in creating two Google Cloud components: A Google App Engine [Service](https://cloud.google.com/appengine) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
 
 The cloud platform must follow [King's Acceptable Use Policies](https://docs.google.com/document/d/1slOyRUquX3OSIh9uKcWQj68HwQ6czUkRMTtqV2SO9B4/edit#heading=h.j9uihjbnbt87).
 
@@ -46,113 +46,130 @@ Optional: set a retention policy of 1 day for the bucket that will be used for t
 gsutil lifecycle set oauth-bucket-lifecycle.json gs://multi-reaction-add-oauthstate
 ```
 
-## Service account
+## Google App Engine
 
-A service account must be assigned to the container to access the GCS buckets.
+**Note**: Cloud Build API must be enabled for the project:
 ```bash
-gcloud iam service-accounts create sa-multireact-slack-app --description="SVC account for running a service in Cloud Run for multireact slack app" --display-name="SA Multireact Slack App"
+gcloud services enable cloudbuild.googleapis.com
 ```
 
-Get the service account full name:
+Initialize App Engine app for the project ([docs](https://cloud.google.com/appengine/docs/standard/python3/quickstart#additional_prerequisites)):
 ```bash
-gcloud iam service-accounts list
+gcloud app create --region=europe-west --project=king-multireact-slack-app-dev
 ```
 
-Grant permissions for each bucket:
-```bash
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
+A new service account with the following nameing conventions is created: `PROJECT_ID@appspot.gserviceaccount.com` ([docs](https://cloud.google.com/appengine/docs/flexible/go/default-service-account#changing_service_account_permissions_)).
 
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-oauthstate
-
-gsutil iam ch serviceAccount:sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-installation
+e.g.
+```text
+king-multireact-slack-app-dev@appspot.gserviceaccount.com
 ```
 
-## Create Slack application
+Grant permissions for each bucket for the App Engine service account:
+```bash
+gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
 
-### Interactivity & Shortcuts
-- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
+gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-oauthstate
+
+gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-installation
+```
+
+Install required deployment dependencies:
+```bash
+gcloud components install app-engine-python
+```
+
+Copy the [app.yaml.template](app.yaml.template) files and adjust the contents in the `### Change this section` part.
+```bash
+cp app.yaml.template default.yaml
+```
+
+**⚠ WARNING**: The first app that is going to be deployed in the App Engine must be deployed as the `default` service ([docs](https://cloud.google.com/appengine/docs/standard/python3/configuration-files#the_default_service)).
+
+Deploy the service:
+```bash
+gcloud app deploy default.yaml --project=king-multireact-slack-app-dev
+```
+
+Find the service endpoint with:
+```bash
+gcloud app browse --no-launch-browser --service=default
+```
+
+### Multiple apps/environments
+To deploy the app multiple times in the same App Engine for different purposes (like test, stage and prod environments), copy [app.yaml.template](app.yaml.template) for each app, then change the contents in the `### Change this section` part (note the the `service:` key in the file).
+
+e.g.
+```bash
+cp app.yaml.template default.yaml
+cp app.yaml.template sandbox.yaml
+```
+
+Deploy the app specifying each service yaml configuration file:
+```bash
+gcloud app deploy default.yaml sandbox.yaml --project=king-multireact-slack-app-dev
+```
+
+Find each sevice endpoint with:
+```bash
+gcloud app browse --no-launch-browser --service=default
+gcloud app browse --no-launch-browser --service=sandbox
+```
+
+### Troubleshooting
+_Problem_: `gcloud app deploy` fails with the following error:
+```text
+ERROR: (gcloud.app.deploy) NOT_FOUND: Unable to retrieve P4SA: [service-236999523341@gcp-gae-service.iam.gserviceaccount.com] from GAIA. Could be GAIA propagation delay or request from deleted apps.
+```
+_Solution_: Try again in a few seconds.
+
+# Create Slack application
+
+## Interactivity & Shortcuts
+- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 - **Create New Shortcut**
     - with **On messages** type
     - that has the Callback ID named `add_reactions`
 <img src="docs/create-shortcut.png" alt="create-shortcut" width="500"/>
 
-### Slash commands
+## Slash commands
 - **Create New Command**
     - Command is `/multireact`
-    - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
+    - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 <img src="docs/create-command.png" alt="create-command" width="500"/>
 
-### OAuth & Permissions
-- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google Cloud Run](#google-cloud-run) section_)
+## OAuth & Permissions
+- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 - **Scopes**
     - **Bot Token Scopes**: Add and OAuth scope for `commands` (might be already added)
 <img src="docs/add-scopes.png" alt="add-scope" width="500"/>
 
-### Event Subscriptions
-- add `<bot address>/slack/events` under _Request URL_
+## Event Subscriptions
+- add `<bot address>/slack/events` under Request URL (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 - expand **Subscribe to bot events**, click on _Add Bot User Event_ and add `app_uninstalled` and `tokens_revoked` events
 <img src="docs/event-subscription.png" alt="event-subscription" width="500"/>
 
-### App Home
+## App Home
 Disable all options
 
-### Basic Information
+## Basic Information
 Add relevant description under **Display Information**
 
-## Environment variables
+# Environment variables
 
-Mandatory environment variables for the Cloud Run Service are taken from the app's **Basic Information** page:
+Mandatory environment variables for the App Engine Service are taken from the app's **Basic Information** page:
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 <img src="docs/app-credentials.png" alt="app-credentials" width="500"/>
 
 Along with other Google Cloud variables:
-- CPUS: max number of cpus assigned for the container (must be an integer)
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user
 - SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state
 - USER_DATA_BUCKET_NAME: bucket for user emoji data
 
 Optional:
-- PORT: port where the app is listening. defaults to `3000`
 - LOG_LEVEL: log verosity. defaults to `INFO`
-
-### Google Cloud Run
-
-Build the image and deploy it to [Google Cloud Registry](https://cloud.google.com/container-registry):
-
-```bash
-# login to the gcp project with "gcloud auth login"
-# setup docker credentials for gcr with "gcloud auth configure-docker"
-docker build -t eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app .
-docker push eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app
-```
-
-Deploy the container to Google Cloud Run using the following command:
-```bash
-gcloud run deploy multireact-slack-app\
- --image eu.gcr.io/king-multireact-slack-app-dev/multireact-slack-app\
- --platform managed\ # Fully managed version of Cloud Run
- --cpu=2\ # CPU limit
- --memory=256Mi\ # memory limit
- --min-instances=1\ # min instances
- --max-instances=20\ # max instances
- --region=europe-west1\
- --port=3000\ # container port
- --service-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com\
- --update-env-vars=SLACK_CLIENT_ID=<client id>,SLACK_CLIENT_SECRET=<client secret>,SLACK_SIGNING_SECRET=<signing secret>,CPUS=2,SLACK_INSTALLATION_GOOGLE_BUCKET_NAME=multi-reaction-add-installation,SLACK_STATE_GOOGLE_BUCKET_NAME=multi-reaction-add-oauthstate,USER_DATA_BUCKET_NAME=multi-reaction-add-userdata\ # env vars
- --allow-unauthenticated # make service publicly accessible
-```
-
-**Notes**
-- Google Cloud Run and Google Container Registry services must be enabled for the project:
-    - `gcloud services enable run.googleapis.com containerregistry.googleapis.com`
-- `--allow-unauthenticated` flag implies that the user who deploys the container has either **Owner** or **Cloud Run Admin** role in order to assing `roles/run.invoker` to `allUsers` for the deployed service, otherwise the following warning will be seen: _WARNING: Setting IAM policy failed_, and the service will fail to be exposed.
-
-Describe the running container to get the HTTPS endpoint:
-```bash
-gcloud run services list
-```
 
 # Local development
 To start development for this app install **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
@@ -165,12 +182,19 @@ To start development for this app install **Python 3.8**, [ngrok](https://ngrok.
         - **/slack/install** - simple interface which allows a user to install the app to a workspace and start the OAuth flow
         - **/slack/oauth_redirect** - endpoint used by Slack to complete the OAuth flow (the _Redirect URL_ under [OAuth & Permissions](#oauth-&-permissions) section)
 - create GCS buckets described in [Google Storage buckets](#google-storage-buckets)
-- create a service account similar to [Service account](#service-account) and generate a key for the account:
+- create a service account, grant access to the Google Cloud Storage buckets (like in [Google App Engine](#google-app-engine) section), and generate a key for the account:
 ```bash
-gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-slack-app@king-multireact-slack-app-dev.iam.gserviceaccount.com
+# create svc account
+gcloud iam service-accounts create sa-multireact-dev --description="SVC account with access to GCS buckets" --display-name="SA GCS dev"
+
+# grant access to buckets
+
+# generate key
+gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-dev@king-multireact-slack-app-dev.iam.gserviceaccount.com
 ```
 - set environment variables according to [Environment variables](#environment-variables) section, along with:
     - GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets (e.g. sa-multireact-key.json)
+    - PORT: optional; defaults to 3000
 - `python main.py` to run the app
 - go to "_ngrok generated https address_/slack/install" to install the app to the workspace and start interracting like in the [Usage](#usage) section.
 

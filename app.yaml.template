@@ -1,0 +1,49 @@
+### App file documentation:
+# https://cloud.google.com/appengine/docs/standard/python3/config/appref
+
+
+### Change this section
+
+# Service name guidelines:
+# https://cloud.google.com/appengine/docs/standard/python3/configuration-files#the_default_service
+service: <service name or "default">
+# Instance types:
+# https://cloud.google.com/appengine/docs/standard#instance_classes
+instance_class: F1
+# Select number of workers based on instance type:
+# https://cloud.google.com/appengine/docs/standard/python3/runtime#entrypoint_best_practices
+entrypoint: gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 --worker-class aiohttp.GunicornWebWorker main:entrypoint
+# Default env vars:
+# https://cloud.google.com/appengine/docs/standard/python3/runtime#environment_variables
+env_variables:
+  SLACK_CLIENT_ID: "client id"
+  SLACK_CLIENT_SECRET: client secret
+  SLACK_SIGNING_SECRET: signing secret
+  SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: multi-reaction-add-installation
+  SLACK_STATE_GOOGLE_BUCKET_NAME: multi-reaction-add-oauthstate
+  USER_DATA_BUCKET_NAME: multi-reaction-add-userdata
+  LOG_LEVEL: INFO
+  PYTHONUNBUFFERED: True
+# Autoscaling documentation:
+# https://cloud.google.com/appengine/docs/standard/python3/config/appref#scaling_elements
+automatic_scaling:
+  min_instances: 1
+  max_instances: 20
+  target_cpu_utilization: 0.8
+  max_concurrent_requests: 30
+
+
+### Do not change this section
+runtime: python38
+inbound_services:
+  - warmup
+handlers:
+  - url: /slack/events
+    secure: always
+    script: auto
+  - url: /slack/install
+    secure: always
+    script: auto
+  - url: /slack/events
+    secure: always
+    script: auto

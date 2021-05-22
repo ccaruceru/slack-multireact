@@ -22,4 +22,3 @@ if __name__ == "__main__":
 
 # TODO: allow only skin tone modifiers + parse messages withouth any spaces
 # TODO: app home with instructions how to use the app
-# TODO: deploy to better infra

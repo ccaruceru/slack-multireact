@@ -1,5 +1,7 @@
 import os
 import logging
+from asyncio import sleep
+from aiohttp import web
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_bolt.context.ack.async_ack import AsyncAck
@@ -38,6 +40,21 @@ app = AsyncApp(
         )
     )
 )
+
+
+async def warmup(request: web.Request) -> web.Response:
+    """Handles Google App Engine warmup requests
+    https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests
+
+    Args:
+        request (web.Request): the aiohttp request
+
+    Returns:
+        web.Response: an aiohttp response
+    """
+    # TODO: check GCS permission here
+    # TODO: ping slack api here
+    return web.Response(text="", status=200)
 
 
 @app.command("/multireact") # https://api.slack.com/interactivity/slash-commands, https://slack.dev/bolt-python/concepts#commands 
@@ -141,6 +158,8 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
                 logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
             except:
                 logger.exception(f"Failed to add reaction {reaction} on message {message_ts} for user {user_id} from channel {channel_id}")
+            finally:
+                await sleep((50+5)//60)  # Slack Api Tier 3 limit
 
     else: # if user set no reactions, display a dialogue to inform the user that no reactions are set
         await client.views_open(
@@ -205,3 +224,7 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
     """
     await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
     logger.info("All tokens were revoked.")
+
+
+# add the warmup route for aiohttp
+app.web_app().add_routes([web.get("/_ah/warmup", warmup)])

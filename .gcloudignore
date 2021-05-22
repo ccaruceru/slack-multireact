@@ -2,7 +2,7 @@
 **/__pycache__
 *.json
 docs
-*.yaml
 .git
 .gitignore
 README.md
+*.template
