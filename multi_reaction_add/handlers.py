@@ -88,29 +88,29 @@ async def save_or_display_reactions(ack: AsyncAck, client: AsyncWebClient, comma
         reactions = await get_valid_reactions(command["text"], client, app, logger) # sanitize the mesage from user and select only reactions
         if len(reactions) > 23: # inform user when reaction limit reached: https://slack.com/intl/en-se/help/articles/206870317-Use-emoji-reactions
             await respond(("Slow down! You tried to save more than 23 reactions :racing_car:\nTry using less reactions this time :checkered_flag:"))
-            logger.info(f"User {user_id} tried to add >23 reactions")
+            logger.info("User %s tried to add >23 reactions", user_id)
 
         elif len(reactions) == 0: # no reactions found in the given text
             await respond(("Oh no! You did not provide any valid reactions :open_mouth:\nMake sure you type the reactions starting with `:`,"
                     " or use the Emoji button (:slightly_smiling_face:) to add one."))
-            logger.info(f"User {user_id} set no valid reactions")
+            logger.info("User %s set no valid reactions", user_id)
 
         else: # valid reactions were given to be saved
             reactions = " ".join(reactions)
             blob.upload_from_string(reactions)
             await respond("Great! Your new reactions are saved :sunglasses: Type `/multireact` to see them at any time.")
-            logger.info(f"User {user_id} saved {reactions}")
+            logger.info("User %s saved %s", user_id, reactions)
 
     else: # otherwise, report to user any reactions they have
         if blob.exists(): # display any reactions the user has saved
             reactions = blob.download_as_text(encoding="utf-8")
             reactions = " ".join([f":{r}:" for r in reactions.split(" ")])
             await respond(f"Your current reactions are: {reactions}. Type `/multireact <new list of emojis>` to change them.")
-            logger.info(f"User {user_id} loaded {reactions}")
+            logger.info("User %s loaded %s", user_id, reactions)
 
         else: # or say that user doesn't have any
             await respond("You do not have any reactions set :anguished:\nType `/multireact <list of emojis>` to set one.")
-            logger.info(f"User {user_id} has no reactions")
+            logger.info("User %s has no reactions", user_id)
 
 
 @app.shortcut("add_reactions")
@@ -156,9 +156,10 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
                     timestamp=message_ts,
                     name=reaction
                 )
-                logger.info(f"User {user_id} reacted {reaction} on message {message_ts} from channel {channel_id}")
+                logger.info("User %s reacted %s on message %s from channel %s", user_id, reaction, message_ts, channel_id)
             except:
-                logger.exception(f"Failed to add reaction {reaction} on message {message_ts} for user {user_id} from channel {channel_id}")
+                logger.exception("Failed to add reaction %s on message %s for user %s from channel %s",
+                                 reaction, message_ts, user_id, channel_id)
             finally:
                 await sleep((50+5)//60)  # Slack Api Tier 3 limit
 
@@ -186,7 +187,7 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
                 ]
             }
         )
-        logger.info(f"User {user_id} has no reactions")
+        logger.info("User %s has no reactions", user_id)
 
 
 @app.event("tokens_revoked")
@@ -205,14 +206,14 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
             await app.installation_store.async_delete_installation(
                 context.enterprise_id, context.team_id, user_id, context.is_enterprise_install
             )
-            logger.info(f"Revoked user token for {user_id}")
+            logger.info("Revoked user token for %s", user_id)
 
     bot_user_ids = event["tokens"].get("bot")
     if bot_user_ids is not None and len(bot_user_ids) > 0:
         await app.installation_store.async_delete_bot(context.enterprise_id, context.team_id,
             context.is_enterprise_install
         )
-        logger.info(f"Revoked bot token for {bot_user_ids}")
+        logger.info("Revoked bot token for %s", bot_user_ids)
 
 
 @app.event("app_uninstalled")
@@ -224,7 +225,7 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
         logger (Logger): optional logger passed to all handlers
     """
     await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
-    logger.info("All tokens were revoked.")
+    logger.info("All tokens were revoked")
 
 
 @app.event("app_home_opened")
@@ -250,7 +251,7 @@ async def update_home_tab(client: AsyncWebClient, event: dict, logger: logging.L
         user_id=user_id,  # Use the user ID associated with the event
         view=view
     )
-    logger.info(f"User {user_id} opened home tab.")
+    logger.info("User %s opened home tab", user_id)
 
 
 # add the warmup route for aiohttp

@@ -44,7 +44,7 @@ class GoogleCloudStorageOAuthStateStore(OAuthStateStore, AsyncOAuthStateStore):
         bucket = self.storage_client.bucket(self.bucket_name)
         blob = bucket.blob(state)
         blob.upload_from_string(str(time.time()))
-        self.logger.debug(f"Issued {state} to the Google bucket")
+        self.logger.debug("Issued %s to the Google bucket", state)
         return state
 
     def consume(self, state: str) -> bool:
@@ -53,15 +53,14 @@ class GoogleCloudStorageOAuthStateStore(OAuthStateStore, AsyncOAuthStateStore):
             blob = bucket.blob(state)
             body = blob.download_as_text(encoding="utf-8")
 
-            self.logger.debug(f"Downloaded {state} from Google bucket")
+            self.logger.debug("Downloaded %s from Google bucket", state)
             created = float(body)
             expiration = created + self.expiration_seconds
             still_valid: bool = time.time() < expiration
 
             blob.delete()
-            self.logger.debug(f"Deleted {state} from Google bucket")
+            self.logger.debug("Deleted %s from Google bucket", state)
             return still_valid
         except Exception as e:  # skipcq: PYL-W0703
-            message = f"Failed to find any persistent data for state: {state} - {e}"
-            self.logger.warning(message)
+            self.logger.warning("Failed to find any persistent data for state: %s - %s", state, e)
             return False

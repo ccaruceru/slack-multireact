@@ -58,14 +58,14 @@ async def _update_emoji_list(app: AsyncApp, token: str, logger: logging.Logger) 
     while True:
         await asyncio.sleep(60) # 1 min
         try:
-            logging.info("Start emoji update")
+            logger.info("Start emoji update")
             old_token = app.client.token
             app.client.token = token
             ALL_EMOJIS = await _get_reactions_in_team(app.client, logger)
             app.client.token = old_token
-            logging.info("Emoji update finished")
+            logger.info("Emoji update finished")
         except SlackApiError:
-            logging.exception("Failed to update emoji list")
+            logger.exception("Failed to update emoji list")
 
 
 async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger) -> List[str]:
@@ -91,7 +91,7 @@ async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger)
                     standard_emojis = json.loads(json_text)
                     standard_emojis = [e["base"] for e in standard_emojis]
                 else:
-                    logger.warning(f"Could not retrieve standard emojis: {resp.status} {resp.reason}")
+                    logger.warning("Could not retrieve standard emojis: %s %s", resp.status, resp.reason)
 
         except (ClientConnectorError, ClientResponseError):
             logger.exception("Failed to get standard emojis")

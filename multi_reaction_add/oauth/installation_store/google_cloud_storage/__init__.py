@@ -59,49 +59,49 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             bucket = self.storage_client.bucket(self.bucket_name)
             blob = bucket.blob(f"{workspace_path}/bot-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as bot-latest")
+            self.logger.debug("Uploaded %s to Google bucket as bot-latest", entity)
             blob = bucket.blob(f"{workspace_path}/bot-{history_version}")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as bot-{history_version}")
+            self.logger.debug("Uploaded %s to Google bucket as bot-%s", entity, history_version)
 
             # per workspace
             entity: str = json.dumps(installation.__dict__)
             blob = bucket.blob(f"{workspace_path}/installer-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as installer-latest")
+            self.logger.debug("Uploaded %s to Google bucket as installer-latest", entity)
             blob = bucket.blob(f"{workspace_path}/installer-{history_version}")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as installer-{history_version}")
+            self.logger.debug("Uploaded %s to Google bucket as installer-%s", entity, history_version)
 
             # per workspace per user
             u_id = installation.user_id or none
             entity: str = json.dumps(installation.__dict__)
             blob = bucket.blob(f"{workspace_path}/installer-{u_id}-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as installer-{u_id}-latest")
+            self.logger.debug("Uploaded %s to Google bucket as installer-%s-latest", entity, u_id)
             blob = bucket.blob(f"{workspace_path}/installer-{u_id}-{history_version}")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket as installer-{u_id}-{history_version}")
+            self.logger.debug("Uploaded %s to Google bucket as installer-%s-%s", entity, u_id, history_version)
 
         else:
             entity: str = json.dumps(installation.to_bot().__dict__)
             bucket = self.storage_client.bucket(self.bucket_name)
             blob = bucket.blob(f"{workspace_path}/bot-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket")
+            self.logger.debug("Uploaded %s to Google bucket as bot-latest", entity)
 
             # per workspace
             entity: str = json.dumps(installation.__dict__)
             blob = bucket.blob(f"{workspace_path}/installer-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket")
+            self.logger.debug("Uploaded %s to Google bucket as installer-latest", entity)
 
             # per workspace per user
             u_id = installation.user_id or none
             entity: str = json.dumps(installation.__dict__)
             blob = bucket.blob(f"{workspace_path}/installer-{u_id}-latest")
             blob.upload_from_string(entity)
-            self.logger.debug(f"Uploaded {entity} to Google bucket")
+            self.logger.debug("Uploaded %s to Google bucket as installer-%s-latest", entity, u_id)
 
     async def async_find_bot(
         self,
@@ -132,12 +132,12 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             bucket = self.storage_client.bucket(self.bucket_name)
             blob = bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
-            self.logger.debug(f"Downloaded {body} from Google bucket")
+            self.logger.debug("Downloaded %s from Google bucket", body)
             data = json.loads(body)
             return Bot(**data)
         except Exception as e:  # skipcq: PYL-W0703
-            message = f"Failed to find bot installation data for enterprise: {enterprise_id}, team: {team_id}: {e}"
-            self.logger.warning(message)
+            self.logger.warning("Failed to find bot installation data for enterprise: %s, team: %s: %s",
+                                enterprise_id, team_id, e)
             return None
 
     async def async_find_installation(
@@ -172,12 +172,12 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             bucket = self.storage_client.bucket(self.bucket_name)
             blob = bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
-            self.logger.debug(f"Downloaded {body} from Google bucket")
+            self.logger.debug("Downloaded %s from Google bucket", body)
             data = json.loads(body)
             return Installation(**data)
         except Exception as e:  # skipcq: PYL-W0703
-            message = f"Failed to find an installation data for enterprise: {enterprise_id}, team: {team_id}: {e}"
-            self.logger.warning(message)
+            self.logger.warning("Failed to find an installation data for enterprise: %s, team: %s: %s",
+                                enterprise_id, team_id, e)
             return None
 
 #
@@ -213,7 +213,8 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         blob = bucket.blob(key)
         if blob.exists():
             blob.delete()
-            self.logger.debug(f"Uninstalled app for enterprise: {enterprise_id}, team: {team_id}, user: {user_id}")
+            self.logger.debug("Uninstalled app for enterprise: %s, team: %s, user: %s",
+                              enterprise_id, team_id, user_id)
 
     async def async_delete_bot(
         self,
@@ -241,7 +242,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         blob = bucket.blob(key)
         if blob.exists():
             blob.delete()
-            self.logger.debug(f"Uninstalled bot for enterprise: {enterprise_id}, team: {team_id}")
+            self.logger.debug("Uninstalled bot for enterprise: %s, team: %s", enterprise_id, team_id)
 
     async def async_delete_all(
         self,

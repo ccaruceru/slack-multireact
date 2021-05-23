@@ -17,7 +17,7 @@ if __name__ == "__main__":
     """Main entrypoint that starts the server
     """
     port = int(os.environ.get("PORT", 3000))
-    logging.info(f"Listening on port {port}")
+    logging.info("Listening on port %d", port)
     app.start(port)
 
 # TODO: update loggers to avoid string concat

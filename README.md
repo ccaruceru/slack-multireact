@@ -236,7 +236,10 @@ To start development for this app install **Python 3.8**, [ngrok](https://ngrok.
 - create a service account, grant access to the Google Cloud Storage buckets (like in [Google App Engine](#google-app-engine) section), and generate a key for the account:
 ```bash
 # create svc account
-gcloud iam service-accounts create sa-multireact-dev --description="SVC account with access to GCS buckets" --display-name="SA GCS dev"
+gcloud iam service-accounts create sa-multireact-dev --description="SVC account with access to GCS buckets" --display-name="SA GCS dev" --project=king-multireact-slack-app-dev
+
+# get svc account full name
+gcloud iam service-accounts list
 
 # grant access to buckets
 
