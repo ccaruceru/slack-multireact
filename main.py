@@ -20,5 +20,5 @@ if __name__ == "__main__":
     logging.info(f"Listening on port {port}")
     app.start(port)
 
-# TODO: app home with instructions how to use the app
+# TODO: update loggers to avoid string concat
 # TODO: handle historical data deletion for installation

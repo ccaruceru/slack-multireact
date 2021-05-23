@@ -7,10 +7,11 @@ from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.respond.async_respond import AsyncRespond
 from slack_bolt.context.async_context import AsyncBoltContext
+from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.web.async_client import AsyncWebClient
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
-from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger
+from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger, build_home_tab_view
 from google.cloud.storage import Client
 
 
@@ -224,6 +225,32 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
     """
     await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
     logger.info("All tokens were revoked.")
+
+
+@app.event("app_home_opened")
+async def update_home_tab(client: AsyncWebClient, event: dict, logger: logging.Logger, request: AsyncBoltRequest) -> None:
+    """Invoked when a user opens up the app Home Tab. It displays a help page for this app.
+
+    Args:
+        client (AsyncWebClient): an initialzied slack web client to communicate with slack API
+        event (dict): payload from slack server for app home opened event
+        logger (Logger): optional logger passed to all handlers
+        request (AsyncBoltRequest): entire request payload from slack server
+    """
+    user_id = event["user"]
+    # https://cloud.google.com/appengine/docs/standard/python/how-requests-are-routed#domain_name_is_included_in_the_request_data
+    if "host" in request.headers and len(request.headers["host"]) > 0:
+        view = build_home_tab_view(app_url=f"https://{request.headers['host'][0]}")
+    elif "Host" in request.headers and len(request.headers["Host"]) > 0:
+        view = build_home_tab_view(app_url=f"https://{request.headers['Host'][0]}")
+    else:
+        view = build_home_tab_view()
+
+    await client.views_publish(
+        user_id=user_id,  # Use the user ID associated with the event
+        view=view
+    )
+    logger.info(f"User {user_id} opened home tab.")
 
 
 # add the warmup route for aiohttp

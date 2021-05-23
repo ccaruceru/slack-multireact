@@ -135,6 +135,111 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     return [r for r in orig_reactions if r in valid_reactions] # return reactions back in order
 
 
+def build_home_tab_view(app_url: str = None) -> dict:
+    """Builds a Slack Block Kit view for the App Home Tab
+
+    Args:
+        app_url (str, optional): Application URL to add additional pictures in the view. Defaults to None.
+
+    Returns:
+        dict: a block kit user interface of type "home"
+    """
+    blocks = []
+    view = {"type": "home", "blocks": blocks }
+    blocks.extend([
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "Setting emojis :floppy_disk:",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Type `/multireact <list of emojis>` in any chat to set a list of emojis for later usage."
+            }
+        }
+    ])
+    if app_url:
+        blocks.extend([
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-write-emojis.png?w=1024&ssl=1",
+                "alt_text": "write emojis"
+            },
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-save.png?w=1024&ssl=1",
+                "alt_text": "saved emojis"
+            }
+        ])
+
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "You can view what you saved any moment by typing `/multireact` in any chat."
+        }
+    })
+    if app_url:
+        blocks.extend([
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-write-nothing.png?w=1024&ssl=1",
+                "alt_text": "view emojis"
+            },
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-view.png?w=1024&ssl=1",
+                "alt_text": "view emojis"
+            }
+        ])
+
+    blocks.extend([
+        {
+            "type": "divider"
+        },
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "Adding Reactions :star-struck:",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Go to a message, click `More Actions`, then click on `Multireact` to react with the saved emojis to the message.\n\nIf you can't see `Multireact`, click `More message shortcuts...` to find it."
+            }
+        }
+    ])
+    if app_url:
+        blocks.extend([
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-none.png?w=1024&ssl=1",
+                "alt_text": "message with no reactions"
+            },
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-menu.png?w=1024&ssl=1",
+                "alt_text": "message menu"
+            },
+            {
+                "type": "image",
+                "image_url": f"{app_url}/img/reaction-add.png?w=1024&ssl=1",
+                "alt_text": "message with reactions"
+            }
+        ])
+
+    return view
+
+
 def setup_logger() -> None:
     """Changes python logger to a json based one that's compatible with Cloud Run logs
     """

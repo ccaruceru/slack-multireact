@@ -2,7 +2,7 @@
 
 Slack bot that allows users to add multiple reactions to a message. Written in Python using [Slack Bolt for Python](https://slack.dev/bolt-python/tutorial/getting-started).
 
-<img src="docs/app.png" alt="logo" width="200"/>
+<img src="img/app.png" alt="logo" width="200"/>
 
 # Usage
 
@@ -10,15 +10,17 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
 
 ## Examples
 - `/multireact` to view saved the reactions
-<img src="docs/reaction-view.png" alt="reaction-view" width="500"/>
+
+    <img src="img/reaction-view.png" alt="reaction-view"/>
 
 - `/multireact 🤠😎😼➕💯` to set a list of reactions
-<img src="docs/reaction-save.png" alt="reaction-save" width="500"/>
+
+    <img src="img/reaction-save.png" alt="reaction-save" width="500"/>
 
 - Add reactions on a message by going to `More Actions` -> `More message shortcuts` -> `Multireact`
-<img src="docs/reaction-none.png" alt="reaction-none" width="500"/>
-<img src="docs/reaction-menu.png" alt="reaction-menu"/>
-<img src="docs/reaction-add.png" alt="reaction-add" width="500"/>
+    1. <img src="img/reaction-none.png" alt="reaction-none" width="350"/>
+    1. <img src="img/reaction-menu.png" alt="reaction-menu" height="300"/>
+    1. <img src="img/reaction-add.png" alt="reaction-add" width="400"/>
 
 
 # Google Cloud deployment
@@ -58,7 +60,7 @@ Initialize App Engine app for the project ([docs](https://cloud.google.com/appen
 gcloud app create --region=europe-west --project=king-multireact-slack-app-dev
 ```
 
-A new service account with the following nameing conventions is created: `PROJECT_ID@appspot.gserviceaccount.com` ([docs](https://cloud.google.com/appengine/docs/flexible/go/default-service-account#changing_service_account_permissions_)).
+A new service account with the following naming convention is created: `PROJECT_ID@appspot.gserviceaccount.com` ([docs](https://cloud.google.com/appengine/docs/flexible/go/default-service-account#changing_service_account_permissions_)).
 
 e.g.
 ```text
@@ -97,7 +99,7 @@ gcloud app browse --no-launch-browser --service=default
 ```
 
 ### Multiple apps/environments
-To deploy the app multiple times in the same App Engine for different purposes (like test, stage and prod environments), copy [app.yaml.template](app.yaml.template) for each app, then change the contents in the `### Change this section` part (note the the `service:` key in the file).
+To deploy the app multiple times in the same App Engine for different purposes (like test, stage and prod environments), copy [app.yaml.template](app.yaml.template) for each app, then change the contents in the `### Change this section` part (and the `service:` key in the file).
 
 e.g.
 ```bash
@@ -161,28 +163,44 @@ _Solution_: Try again in a few seconds.
 - Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 - **Create New Shortcut**
     - with **On messages** type
-    - that has the Callback ID named `add_reactions`
-<img src="docs/create-shortcut.png" alt="create-shortcut" width="500"/>
+    - set the Name to `Multireact`
+    - add a short description
+    - set the Callback ID to `add_reactions`
+
+    <img src="img/create-shortcut.png" alt="create-shortcut" width="500"/>
 
 ## Slash commands
 - **Create New Command**
     - Command is `/multireact`
     - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
-<img src="docs/create-command.png" alt="create-command" width="500"/>
+    - and add a Short description and a usage hint
+
+    <img src="img/create-command.png" alt="create-command" width="500"/>
 
 ## OAuth & Permissions
 - **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
-- **Scopes**
-    - **Bot Token Scopes**: Add and OAuth scope for `commands` (might be already added)
-<img src="docs/add-scopes.png" alt="add-scope" width="500"/>
+
+    <img src="img/redirect-url.png" alt="redirect-url" width="500"/>
+- Go to **Scopes** section and -> **Bot Token Scopes** and add an OAuth scope for `commands` (might be already added)
+
+    <img src="img/add-scopes.png" alt="add-scope" width="500"/>
 
 ## Event Subscriptions
+- enable Events
+
+    <img src="img/event-enable.png" alt="event-enable" width="500"/>
 - add `<bot address>/slack/events` under Request URL (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
-- expand **Subscribe to bot events**, click on _Add Bot User Event_ and add `app_uninstalled` and `tokens_revoked` events
-<img src="docs/event-subscription.png" alt="event-subscription" width="500"/>
+- expand **Subscribe to bot events**, click on _Add Bot User Event_ and add the following events:
+    - `app_home_opened`
+    - `app_uninstalled`
+    - `tokens_revoked`
+
+    <img src="img/event-subscription.png" alt="event-subscription" width="500"/>
 
 ## App Home
-Disable all options
+Enable `Home Tab`
+
+<img src="img/app-home.png" alt="app-home" width="500"/>
 
 ## Basic Information
 Add relevant description under **Display Information**
@@ -193,7 +211,8 @@ Mandatory environment variables for the App Engine Service are taken from the ap
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
-<img src="docs/app-credentials.png" alt="app-credentials" width="500"/>
+
+    <img src="img/app-credentials.png" alt="app-credentials" width="500"/>
 
 Along with other Google Cloud variables:
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user

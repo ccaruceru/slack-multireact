@@ -47,3 +47,5 @@ handlers:
   - url: /slack/events
     secure: always
     script: auto
+  - url: /img
+    static_dir: img

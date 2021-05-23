@@ -1,7 +1,6 @@
 .vscode
 **/__pycache__
 *.json
-docs
 .git
 .gitignore
 README.md
