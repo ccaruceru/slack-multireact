@@ -4,6 +4,9 @@ Slack bot that allows users to add multiple reactions to a message. Written in P
 
 <img src="img/app.png" alt="logo" width="200"/>
 
+# Install
+Open https://king-multireact-slack-app-dev.ew.r.appspot.com/slack/install, click the `Add to Slack` button and allow the application to be installed to your workspace.
+
 # Usage
 
 The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se/help/articles/201259356-Slash-commands-in-Slack) and a `Multireact` [message Shortcut](https://slack.com/intl/en-se/help/articles/360004063011-Work-with-apps-in-Slack-using-shortcuts#message-shortcuts).
