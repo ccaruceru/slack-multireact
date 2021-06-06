@@ -44,7 +44,7 @@ handlers:
   - url: /slack/install
     secure: always
     script: auto
-  - url: /slack/events
+  - url: /slack/oauth_redirect
     secure: always
     script: auto
   - url: /img
