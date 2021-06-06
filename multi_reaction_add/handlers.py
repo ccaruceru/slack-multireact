@@ -53,8 +53,6 @@ async def warmup(request: web.Request) -> web.Response:
     Returns:
         web.Response: an aiohttp response
     """
-    # TODO: check GCS permission here
-    # TODO: ping slack api here
     return web.Response(text="", status=200)
 
 
@@ -200,6 +198,7 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
         logger (Logger): optional logger passed to all handlers
     """
     # TODO: stop emoji thread?
+    # TODO: delete user data too
     user_ids = event["tokens"].get("oauth")
     if user_ids is not None and len(user_ids) > 0:
         for user_id in user_ids:

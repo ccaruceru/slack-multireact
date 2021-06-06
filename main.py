@@ -21,5 +21,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     logging.info("Listening on port %d", port)
     app.start(port)
-
-# TODO: handle historical data deletion for installation
