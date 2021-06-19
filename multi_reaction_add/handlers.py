@@ -197,7 +197,6 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
         context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
         logger (Logger): optional logger passed to all handlers
     """
-    # TODO: stop emoji thread?
     # TODO: delete user data too
     user_ids = event["tokens"].get("oauth")
     if user_ids is not None and len(user_ids) > 0:
@@ -223,7 +222,13 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
         context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
         logger (Logger): optional logger passed to all handlers
     """
+    # delete all installations
     await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
+    # stop EmojiUpdate thread; import now to get latest value
+    from multi_reaction_add.internals import EMOJI_TASK
+    if EMOJI_TASK and not EMOJI_TASK.done():
+        EMOJI_TASK.cancel()
+
     logger.info("All tokens were revoked")
 
 

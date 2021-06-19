@@ -14,6 +14,7 @@ from pythonjsonlogger import jsonlogger
 
 # list of all emojis available in this team
 ALL_EMOJIS = []
+EMOJI_TASK = None
 
 
 async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts: str, user_id: str) -> List[str]:
@@ -111,7 +112,7 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     Returns:
         list: a list of strings containing valid emojis from user
     """
-    global ALL_EMOJIS
+    global ALL_EMOJIS, EMOJI_TASK
 
     reactions = re.findall(r":[a-z0-9-_\+']+(?:::skin\-tone\-\d+)?:", text) # find all :emoji: and :thumbsup::skin-tone-2: strings
     reactions = list(dict.fromkeys(reactions)) # remove duplicates and keep original positions
@@ -125,10 +126,10 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     for r in reactions:
         reactions_with_modifier.append(r) if "::" in r else simple_reactions.append(r)
 
-    if not ALL_EMOJIS:
+    if not EMOJI_TASK or EMOJI_TASK.done():
         ALL_EMOJIS = await _get_reactions_in_team(client, logger)
         # start a thread to update all emojis for future use
-        asyncio.create_task(coro=_update_emoji_list(app, client.token, logger), name="EmojiUpdate")
+        EMOJI_TASK = asyncio.create_task(coro=_update_emoji_list(app, client.token, logger), name="EmojiUpdate")
 
     valid_reactions =  [r for r in simple_reactions        if r                in ALL_EMOJIS]
     valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in ALL_EMOJIS]
