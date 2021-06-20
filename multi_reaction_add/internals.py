@@ -157,6 +157,12 @@ async def delete_users_data(bucket: Bucket, slack_client_id: str, enterprise_id:
             blob.delete()
 
 
+async def stop_emoji_update() -> None:
+    """Stop the thread which updates `ALL_EMOJIS`"""
+    if EMOJI_TASK and not EMOJI_TASK.done():
+        EMOJI_TASK.cancel()
+
+
 def user_data_key(slack_client_id: str, enterprise_id: Optional[str], team_id: str, user_id: str) -> str:
     """Return the location for user data (emojis) in the google bucket
 

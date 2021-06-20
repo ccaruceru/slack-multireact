@@ -11,7 +11,7 @@ from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.web.async_client import AsyncWebClient
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
-from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger, build_home_tab_view, delete_users_data, user_data_key
+from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger, build_home_tab_view, delete_users_data, user_data_key, stop_emoji_update
 from google.cloud.storage import Client
 
 
@@ -228,12 +228,8 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
         context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
         logger (Logger): optional logger passed to all handlers
     """
-    # delete all installations
     await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
-    # stop EmojiUpdate thread; import now to get latest value
-    from multi_reaction_add.internals import EMOJI_TASK
-    if EMOJI_TASK and not EMOJI_TASK.done():
-        EMOJI_TASK.cancel()
+    await stop_emoji_update()
 
     logger.info("All tokens were revoked")
 
