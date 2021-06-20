@@ -22,5 +22,6 @@ if __name__ == "__main__":
     logging.info("Listening on port %d", port)
     app.start(port)
 
+# TODO: use slack user token
 # TODO: PEP 8
 # TODO: tests

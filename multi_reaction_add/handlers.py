@@ -11,7 +11,7 @@ from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.web.async_client import AsyncWebClient
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
-from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger, build_home_tab_view
+from multi_reaction_add.internals import get_valid_reactions, get_user_reactions, setup_logger, build_home_tab_view, delete_users_data, user_data_key
 from google.cloud.storage import Client
 
 
@@ -75,12 +75,12 @@ async def save_or_display_reactions(ack: AsyncAck, client: AsyncWebClient, comma
     # or
     # {'api_app_id': 'A01TWV8NAEN', 'channel_id': 'D01SQA99362', 'channel_name': 'directmessage', 'command': '/multireact', 'enterprise_id': 'EG26V10SE', 'enterprise_name': 'ABK-SB', 'is_enterprise_install': 'false', 'response_url': 'https://hooks.slack....UFIRvQgGs0', 'team_domain': 'kingcom-sandbox', 'team_id': 'T8T3GKUKZ', 'token': 'wF8MDfFS8BLd30KFYLT1MlZa', 'trigger_id': '1995489393941.299118...b1d2b8f830', 'user_id': 'U01SXA059B5', 'user_name': 'cristian.caruceru'}
     user_id = command["user_id"]
-    team_id = command["team_id"]
-    enterprise_id = "none"
-    if "enterprise_id" in command:
-        enterprise_id = command["enterprise_id"]
-
-    blob = bucket.blob(f"{slack_client_id}/{enterprise_id}-{team_id}/{user_id}")
+    key = user_data_key(slack_client_id=slack_client_id,
+        enterprise_id=(command["enterprise_id"] if "enterprise_id" in command else None),
+        team_id=command["team_id"],
+        user_id=user_id
+    )
+    blob = bucket.blob(key)
 
     if "text" in command: # this command has some text in it => will save new reactions
         reactions = await get_valid_reactions(command["text"], client, app, logger) # sanitize the mesage from user and select only reactions
@@ -128,14 +128,14 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
     # or
     # {'action_ts': '1619339417.302061', 'callback_id': 'add_reactions', 'channel': {'id': 'C01V7KXNRRS', 'name': 'slapp-1119'}, 'enterprise': {'id': 'EG26V10SE', 'name': 'ABK-SB'}, 'is_enterprise_install': False, 'message': {'blocks': [...], 'client_msg_id': '437b2675-6524-4724-a...69a4e0b9f6', 'team': 'T8T3GKUKZ', 'text': '210', 'ts': '1619339414.000200', 'type': 'message', 'user': 'U01SXA059B5'}, 'message_ts': '1619339414.000200', 'response_url': 'https://hooks.slack....tkt5yMCogg', 'team': {'domain': 'kingcom-sandbox', 'enterprise_id': 'EG26V10SE', 'enterprise_name': 'ABK-SB', 'id': 'T8T3GKUKZ'}, 'token': 'wF8MDfFS8BLd30KFYLT1MlZa', 'trigger_id': '1991796659910.299118...7619ad8bd4', 'type': 'message_action', 'user': {'id': 'U01SXA059B5', 'name': 'cristian.caruceru', 'team_id': 'T8T3GKUKZ', 'username': 'cristian.caruceru'}}
     user_id = shortcut["user"]["id"]
-    team_id = shortcut["team"]["id"]
-    enterprise_id = "none"
-    if shortcut["enterprise"]:
-        enterprise_id = shortcut["enterprise"]["id"]
-
     message_ts = shortcut["message_ts"]
     channel_id = shortcut["channel"]["id"]
-    blob = bucket.blob(f"{slack_client_id}/{enterprise_id}-{team_id}/{user_id}")
+    key = user_data_key(slack_client_id=slack_client_id,
+        enterprise_id=(shortcut["enterprise"]["id"] if shortcut["enterprise"] else None),
+        team_id=shortcut["team"]["id"],
+        user_id=user_id,
+    )
+    blob = bucket.blob(key)
     reactions = None
     if blob.exists():
         reactions = blob.download_as_text(encoding="utf-8")
@@ -191,23 +191,29 @@ async def add_reactions(ack: AsyncAck, shortcut: dict, client: AsyncWebClient, l
 @app.event("tokens_revoked")
 async def handle_token_revocations(event: dict, context: AsyncBoltContext, logger: logging.Logger) -> None:
     """Deletes the token given by the OAuth process when a user removes the app (i.e revokes the installation tokens)
+    and removes the user emoji data too
 
     Args:
         event (dict): payload with user or bot ids
         context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with additional information
         logger (Logger): optional logger passed to all handlers
     """
-    # TODO: delete user data too
     user_ids = event["tokens"].get("oauth")
     if user_ids is not None and len(user_ids) > 0:
         for user_id in user_ids:
+            # delete user installation
             await app.installation_store.async_delete_installation(
                 context.enterprise_id, context.team_id, user_id, context.is_enterprise_install
             )
             logger.info("Revoked user token for %s", user_id)
 
+        # delete user data
+        await delete_users_data(bucket, slack_client_id, context.enterprise_id, context.team_id, user_ids)
+        logger.info("Deleted user data for %s", user_ids)
+
     bot_user_ids = event["tokens"].get("bot")
     if bot_user_ids is not None and len(bot_user_ids) > 0:
+        # delete any bot installation
         await app.installation_store.async_delete_bot(context.enterprise_id, context.team_id,
             context.is_enterprise_install
         )

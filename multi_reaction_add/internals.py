@@ -4,8 +4,9 @@ import asyncio
 import logging
 import json
 from collections import OrderedDict
-from typing import List
+from typing import List, Optional
 from aiohttp import ClientSession, ClientConnectorError, ClientResponseError
+from google.cloud.storage.bucket import Bucket
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
@@ -134,6 +135,44 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     valid_reactions =  [r for r in simple_reactions        if r                in ALL_EMOJIS]
     valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in ALL_EMOJIS]
     return [r for r in orig_reactions if r in valid_reactions] # return reactions back in order
+
+
+async def delete_users_data(bucket: Bucket, slack_client_id: str, enterprise_id: Optional[str], team_id: str, user_ids: List[str]) -> None:
+    """Delete user data emojis for all input user ids
+
+    Args:
+        bucket (Bucket): GCS bucket containing user data
+        slack_client_id (str): Slack application client id
+        enterprise_id (Optional[str]): Slack enterprise id or None
+        team_id (str): Slack team id
+        user_ids (List[str]): Slack user ids
+    """
+    for user_id in user_ids:
+        blob = bucket.blob(user_data_key(slack_client_id=slack_client_id,
+            enterprise_id=enterprise_id,
+            team_id=team_id,
+            user_id=user_id
+        ))
+        if blob.exists():
+            blob.delete()
+
+
+def user_data_key(slack_client_id: str, enterprise_id: Optional[str], team_id: str, user_id: str) -> str:
+    """Return the location for user data (emojis) in the google bucket
+
+    Args:
+        slack_client_id (str): Slack application client id
+        enterprise_id (Optional[str]): Slack enterprise id or None
+        team_id (str): Slack team id
+        user_id (str): Slack user id
+
+    Returns:
+        str: location in the GCS bucket for the user data
+    """
+    return (f"{slack_client_id}/{enterprise_id}-{team_id}/{user_id}"
+            if enterprise_id
+            else
+            f"{slack_client_id}/none-{team_id}/{user_id}")
 
 
 def build_home_tab_view(app_url: str = None) -> dict:
