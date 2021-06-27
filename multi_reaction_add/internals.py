@@ -47,12 +47,11 @@ async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts
     return []
 
 
-async def _update_emoji_list(app: AsyncApp, token: str, logger: logging.Logger) -> None:
+async def _update_emoji_list(app: AsyncApp, logger: logging.Logger) -> None:
     """Updates the global emojis list with latest from slack api
 
     Args:
         app (AsyncApp): Bolt application instance
-        token (str): bot token to make api calls
         logger (logging.Logger): logger for printing messages
     """
     global ALL_EMOJIS
@@ -62,7 +61,7 @@ async def _update_emoji_list(app: AsyncApp, token: str, logger: logging.Logger) 
         try:
             logger.info("Start emoji update")
             old_token = app.client.token
-            app.client.token = token
+            app.client.token = os.environ["SLACK_BOT_USER_OAUTH_TOKEN"]
             ALL_EMOJIS = await _get_reactions_in_team(app.client, logger)
             app.client.token = old_token
             logger.info("Emoji update finished")
@@ -130,7 +129,7 @@ async def get_valid_reactions(text: str, client: AsyncWebClient, app: AsyncApp, 
     if not EMOJI_TASK or EMOJI_TASK.done():
         ALL_EMOJIS = await _get_reactions_in_team(client, logger)
         # start a thread to update all emojis for future use
-        EMOJI_TASK = asyncio.create_task(coro=_update_emoji_list(app, client.token, logger), name="EmojiUpdate")
+        EMOJI_TASK = asyncio.create_task(coro=_update_emoji_list(app, logger), name="EmojiUpdate")
 
     valid_reactions =  [r for r in simple_reactions        if r                in ALL_EMOJIS]
     valid_reactions += [r for r in reactions_with_modifier if r[:r.find("::")] in ALL_EMOJIS]

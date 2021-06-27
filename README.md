@@ -188,6 +188,10 @@ _Solution_: Try again in a few seconds.
 
     <img src="img/add-scopes.png" alt="add-scope" width="500"/>
 
+- After the application has been installed to the workspace, OAuth tokens are generated in the **OAuth Tokens for Your Workspace** section. You'll need the `Bot User OAuth Token` when running the Multireact app.
+
+    <img src="img/oauth-tokens.png" alt="oauth-tokens" width="500"/>
+
 ## Event Subscriptions
 - enable Events
 
@@ -201,7 +205,7 @@ _Solution_: Try again in a few seconds.
     <img src="img/event-subscription.png" alt="event-subscription" width="500"/>
 
 ## App Home
-Enable `Home Tab`
+Enable `Home Tab` and disable everything else.
 
 <img src="img/app-home.png" alt="app-home" width="500"/>
 
@@ -216,6 +220,10 @@ Mandatory environment variables for the App Engine Service are taken from the ap
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 
     <img src="img/app-credentials.png" alt="app-credentials" width="500"/>
+
+- SLACK_BOT_USER_OAUTH_TOKEN: the **Bot User OAuth Token** from _OAuth & Permissions_ configuration page
+
+    <img src="img/oauth-tokens.png" alt="oauth-tokens" width="500"/>
 
 Along with other Google Cloud variables:
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user
@@ -272,6 +280,7 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
                 "SLACK_CLIENT_ID": "clientid",
                 "SLACK_CLIENT_SECRET": "clientsecret",
                 "SLACK_SIGNING_SECRET": "signingsecret",
+                "SLACK_BOT_USER_OAUTH_TOKEN": "xoxb-token",
                 "LOG_LEVEL": "INFO",
                 "PORT": "3000",
                 "GOOGLE_APPLICATION_CREDENTIALS": "sa-multireact-key.json",
