@@ -1,0 +1,8 @@
+[DESIGN]
+max-args=8
+
+[FORMAT]
+max-line-length=120
+
+[SIMILARITIES]
+min-similarity-lines=6

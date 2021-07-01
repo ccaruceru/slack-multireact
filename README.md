@@ -53,7 +53,7 @@ gsutil lifecycle set oauth-bucket-lifecycle.json gs://multi-reaction-add-oauthst
 
 ## Google App Engine
 
-**Note**: Cloud Build API must be enabled for the project:
+**ℹ Note**: Cloud Build API must be enabled for the project:
 ```bash
 gcloud services enable cloudbuild.googleapis.com
 ```
@@ -237,7 +237,7 @@ Optional:
 To start development for this app install **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
 - `pip install -r requirements.txt`
 - in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
-    - **note**: sometimes the VPN client will prevent ngrok from establishing a connection
+    - **ℹ Note**: sometimes the VPN client will prevent ngrok from establishing a connection
 - setup a slack application according to [Create Slack application](#create-slack-application) section, using _ngrok generated https address_
     - the HTTP endpoints created by Bolt framework are:
         - **/slack/events** - used as _Request URL_ for incoming slack API requests (commands and shortcuts)
@@ -294,6 +294,24 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
 ```
 
 Then press `F5` to start debugging.
+
+### Linting
+Use `pylint` to run static code analysis. Code rate should always be 10.00/10.
+```bash
+pip install pylint
+
+pylint main.py multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
+```
+
+Then use `pydocstyle` and `darglint` to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). No errors or warnings should be reported.
+```bash
+pip install pydocstyle darglint
+
+pydocstyle main.py multi_reaction_add
+darglint main.py multi_reaction_add
+```
+
+_ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
 
 ## More
 
