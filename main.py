@@ -24,8 +24,8 @@ def _check_env() -> None:
     Raises:
         Exception: when one or more environment variables are missing
     """
-    keys = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_BOT_USER_OAUTH_TOKEN",
-            "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME", "SLACK_STATE_GOOGLE_BUCKET_NAME", "USER_DATA_BUCKET_NAME"]
+    keys = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME",
+            "SLACK_STATE_GOOGLE_BUCKET_NAME", "USER_DATA_BUCKET_NAME"]
     missing = [key for key in keys if key not in os.environ.keys()]
     if missing:
         raise Exception(f"The following environment variables are not set: {missing}")
