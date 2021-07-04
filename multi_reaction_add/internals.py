@@ -3,11 +3,12 @@
 
 import os
 import re
+import sys
 import json
 import asyncio
 import logging
-from asyncio.tasks import Task
-from typing import List, Optional
+from asyncio import CancelledError, TimeoutError, Task
+from typing import List, Optional, TextIO
 from collections import OrderedDict
 from aiohttp import ClientSession, ClientConnectorError, ClientResponseError
 
@@ -63,16 +64,17 @@ class EmojiOperator:
 
         return []
 
-    async def _update_emoji_list(self, app: AsyncApp, token: str, logger: logging.Logger) -> None:
+    async def _update_emoji_list(self, app: AsyncApp, token: str, logger: logging.Logger, sleep: int = 60) -> None:
         """Updates the global emojis list with latest from slack api.
 
         Args:
             app (AsyncApp): Bolt application instance
             token (str): bot token to make api calls
             logger (logging.Logger): logger for printing messages
+            sleep (int): amount of seconds to sleep. Defaults to 60
         """
         while True:
-            await asyncio.sleep(60)  # 1 min
+            await asyncio.sleep(sleep)
             try:
                 logger.info("Start emoji update")
                 old_token = app.client.token
@@ -82,12 +84,15 @@ class EmojiOperator:
                 logger.info("Emoji update finished")
             except SlackApiError:
                 logger.exception("Failed to update emoji list")
+            except (CancelledError, TimeoutError):  # from sleep
+                return
 
     @staticmethod
     async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger) -> List[str]:
-        """Gets the custom emojis available in a workspace plus the standard available ones.
+        """Gets the custom + standard emojis available in a Slack workspace, and community emojis too.
 
-        https://king.slack.com/help/requests/3477073
+        It returns the basic community emojis from emojidex.com because they are not included in the
+        Slack API response. https://king.slack.com/help/requests/3477073
 
         Args:
             client (AsyncWebClient): an initialized slack WebClient for API calls
@@ -164,7 +169,7 @@ class EmojiOperator:
         return [r for r in orig_reactions if r in valid_reactions]
 
     async def stop_emoji_update(self) -> None:
-        """Stop the thread which updates `self.all_emojis`."""
+        """Stop the thread which updates `self._all_emojis`."""
         if self._emoji_task and not self._emoji_task.done():
             self._emoji_task.cancel()
 
@@ -319,14 +324,35 @@ def build_home_tab_view(app_url: str = None) -> dict:
     return view
 
 
-def setup_logger() -> None:
-    """Changes python logger to a json based one that's compatible with Cloud Run logs."""
+def check_env() -> None:
+    """Checks if mandatory environment variables are set.
+
+    Raises:
+        Exception: when one or more environment variables are missing
+    """
+    keys = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME",
+            "SLACK_STATE_GOOGLE_BUCKET_NAME", "USER_DATA_BUCKET_NAME"]
+    missing = [key for key in keys if key not in os.environ.keys()]
+    if missing:
+        raise Exception(f"The following environment variables are not set: {missing}")
+
+
+def setup_logger(stream: TextIO = sys.stderr) -> logging.Logger:
+    """Changes python root logger to a json based one that's compatible with Cloud Run logs.
+
+    Args:
+        stream (TextIO): a text stream where to write the logs. Defaults to sys.stderr
+
+    Returns:
+        logging.Logger: a reference to the root logger. Can be ignored.
+    """
     logger = logging.getLogger()
     logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-    log_handler = logging.StreamHandler()
+    log_handler = logging.StreamHandler(stream)
     formatter = CloudLoggingJsonFormatter("%(timestamp)s %(severity)s %(funcName)s %(component)s %(message)s")
     log_handler.setFormatter(formatter)
     logger.addHandler(log_handler)
+    return logger
 
 
 class CloudLoggingJsonFormatter(jsonlogger.JsonFormatter):

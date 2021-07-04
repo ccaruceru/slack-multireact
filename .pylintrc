@@ -6,3 +6,6 @@ max-line-length=120
 
 [SIMILARITIES]
 min-similarity-lines=6
+
+[VARIABLES]
+redefining-builtins-modules=asyncio
