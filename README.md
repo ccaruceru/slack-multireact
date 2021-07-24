@@ -317,7 +317,7 @@ Use the following `.vscode/settings.json` configuration to setup testing with [u
     "python.testing.unittestArgs": [
         "-v",
         "-s",
-        ".\\tests",
+        "./tests",
         "-p",
         "test_*.py"
     ],

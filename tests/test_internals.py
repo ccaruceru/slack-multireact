@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for internals.py"""
 
+from asyncio.tasks import Task
 import os
 import json
 import sys
@@ -218,7 +219,7 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_valid_reactions(self):
         emoji_operator = EmojiOperator()
-        emoji_operator._emoji_task = Mock()
+        emoji_operator._emoji_task = Mock(spec=Task)
         emoji_operator._emoji_task.done.return_value = False
         emoji_operator._all_emojis = ["smile", "wink", "face", "laugh"]
         
