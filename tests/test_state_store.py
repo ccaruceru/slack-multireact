@@ -32,7 +32,7 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
             logger=self.logger
         )
 
-    async def test_get_logger(self):
+    def test_get_logger(self):
         self.assertEqual(self.state_store.logger, self.logger)
 
 
