@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests for handlers.py"""
 
-from slack_bolt.request.async_request import AsyncBoltRequest
-from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 import os
-import sys
 import json
-import asyncio
 import logging
 import unittest
 from unittest.mock import Mock, AsyncMock, patch, call
@@ -18,8 +14,11 @@ from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.async_context import AsyncBoltContext
 from slack_bolt.context.respond.async_respond import AsyncRespond
+from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+
+from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 
 
 # necessary OS env vars for handlers.py module
