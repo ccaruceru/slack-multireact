@@ -1,3 +1,5 @@
+# https://www.codeac.io/documentation/pylint-configuration.html
+
 [DESIGN]
 max-args=8
 
