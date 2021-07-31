@@ -14,8 +14,12 @@ from slack_sdk.oauth.installation_store.models.installation import Installation
 
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 
+# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
 class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
+    """Tests for GoogleCloudStorageInstallationStore"""
+
     async def asyncSetUp(self):
+        """Setup test"""
         self.blob = Mock(spec=Blob)
         self.bucket = Mock(spec=Bucket)
         self.bucket.blob.return_value = self.blob
@@ -39,10 +43,13 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             enterprise_id="eid")
 
     def test_get_logger(self):
+        """Test get_logger method"""
         self.assertEqual(self.installation_store.logger, self.logger)
 
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore._save_entity")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore._save_entity")
     async def test_async_save(self, save_entity: Mock):
+        """Test async_save method"""
         await self.installation_store.async_save(self.installation)
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
         save_entity.assert_has_calls([
@@ -70,6 +77,9 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         ])
 
     def test_save_entity_and_test_key(self):
+        """Test save_entity and test_key methods"""
+        # pylint: disable=protected-access
+
         entity = "some data"
         # test upload user data enterprise install
         self.installation_store._save_entity(data_type="dtype",
@@ -94,7 +104,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             user_id=self.installation.user_id,
             is_enterprise_install=False)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/dtype-{self.installation.user_id}")
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/"
+            f"dtype-{self.installation.user_id}")
 
         self.bucket.reset_mock()
 
@@ -110,7 +121,9 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             f"{self.client_id}/{self.installation.enterprise_id}-none/dtype")
 
     async def test_async_find_bot(self):
-        self.blob.download_as_text.return_value = json.dumps({"bot_token": "xoxb-token",
+        """Test async_find_bot method"""
+        self.blob.download_as_text.return_value = json.dumps({
+            "bot_token": "xoxb-token",
             "bot_id": "bid",
             "bot_user_id": "buid",
             "installed_at": time.time()})
@@ -136,10 +149,12 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(bot)
 
     async def test_async_find_installation(self):
+        """Test async_find_installation method"""
         self.blob.download_as_text.return_value = json.dumps({"user_id": self.installation.user_id})
 
         # test installation found
-        installation = await self.installation_store.async_find_installation(enterprise_id=self.installation.enterprise_id,
+        installation = await self.installation_store.async_find_installation(
+            enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
             user_id=self.installation.user_id,
             is_enterprise_install=self.installation.is_enterprise_install)
@@ -154,7 +169,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
 
         # test installation not found
         self.blob.download_as_text.side_effect = Exception()
-        installation = await self.installation_store.async_find_installation(enterprise_id=self.installation.enterprise_id,
+        installation = await self.installation_store.async_find_installation(
+            enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
             user_id=self.installation.user_id,
             is_enterprise_install=self.installation.is_enterprise_install)
@@ -162,6 +178,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(installation)
 
     async def test_async_delete_installation_and_test_delete_entity(self):
+        """Test async_delete_installation and test_delete_entity methods"""
+
         # test delete blob exist
         self.blob.exists.return_value = True
         await self.installation_store.async_delete_installation(enterprise_id=self.installation.enterprise_id,
@@ -185,8 +203,10 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         self.blob.exists.assert_called_once()
         self.blob.delete.assert_not_called()
 
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore._delete_entity")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore._delete_entity")
     async def test_async_delete_bot(self, delete_entity: Mock):
+        """Test async_delete_bot method"""
         await self.installation_store.async_delete_bot(enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
             is_enterprise_install=self.installation.is_enterprise_install)
@@ -196,9 +216,12 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             user_id=None,
             is_enterprise_install=self.installation.is_enterprise_install)
 
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore.async_delete_bot")
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore.async_delete_installation")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore.async_delete_bot")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore.async_delete_installation")
     async def test_async_delete_all(self, async_delete_installation: AsyncMock, async_delete_bot: AsyncMock):
+        """Test async_delete_all method"""
         await self.installation_store.async_delete_all(enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
             is_enterprise_install=self.installation.is_enterprise_install)
@@ -210,9 +233,12 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             team_id=self.installation.team_id,
             is_enterprise_install=self.installation.is_enterprise_install)
 
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore.delete_bot")
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage.GoogleCloudStorageInstallationStore.delete_installation")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore.delete_bot")
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore.delete_installation")
     def test_delete_all(self, delete_installation: Mock, delete_bot: Mock):
+        """Test delete_all method"""
         self.installation_store.delete_all(enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
             is_enterprise_install=self.installation.is_enterprise_install)

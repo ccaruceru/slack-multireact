@@ -12,8 +12,12 @@ from google.cloud.storage.client import Client
 
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
 
+# pylint: disable=attribute-defined-outside-init
 class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
+    """Test GoogleCloudStorageOAuthStateStore class"""
+
     async def asyncSetUp(self):
+        """Setup tests"""
         self.blob = Mock(spec=Blob)
         self.blob.download_as_text.return_value = str(time.time())
 
@@ -34,10 +38,12 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_get_logger(self):
+        """Test get_logger method"""
         self.assertEqual(self.state_store.logger, self.logger)
 
 
     async def test_async_issue(self):
+        """Test async_issue method"""
         state = await self.state_store.async_issue()
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
         self.bucket.blob.assert_called_once()
@@ -46,13 +52,15 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
         self.assertRegex(self.blob.upload_from_string.call_args.args[0], r"\d{10,}.\d{6,}")
 
     async def test_async_comsume(self):
+        """Test async_comsume method"""
         state = "state"
         # test consume returns valid
         valid = await self.state_store.async_consume(state=state)
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
         self.bucket.blob.assert_called_once_with(state)
         self.blob.download_as_text.assert_called_once_with(encoding="utf-8")
-        self.assertTrue(time.time() < float(self.blob.download_as_text.return_value) + self.state_store.expiration_seconds)
+        self.assertTrue(
+            time.time() < float(self.blob.download_as_text.return_value) + self.state_store.expiration_seconds)
         self.blob.delete.assert_called_once()
         self.assertTrue(valid)
 
@@ -61,7 +69,8 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
         # test consume returns invalid
         self.state_store.expiration_seconds = 0
         valid = await self.state_store.async_consume(state=state)
-        self.assertFalse(time.time() < float(self.blob.download_as_text.return_value) + self.state_store.expiration_seconds)
+        self.assertFalse(
+            time.time() < float(self.blob.download_as_text.return_value) + self.state_store.expiration_seconds)
         self.assertFalse(valid)
 
         self.blob.reset_mock()

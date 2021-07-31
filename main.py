@@ -7,6 +7,8 @@ Examples:
 
 TODO:
     * code coverage
+    * split img to docs and img
+    * move main.py to handlers.py (update docs)
     * create new client for emoji update to avoid concurrency problems(?)
     * use X-Cloud-Trace-Context to group logs: https://cloud.google.com/appengine/docs/standard/python3/writing-application-logs#writing_structured_logs # pylint: disable=line-too-long
 """

@@ -291,7 +291,7 @@ Use `pylint` to run static code analysis. Code rate should always be 10.00/10.
 ```bash
 pip install pylint
 
-pylint main.py multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
+pylint main.py tests multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
 ```
 
 Then use `pydocstyle` and `darglint` to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). No errors or warnings should be reported.

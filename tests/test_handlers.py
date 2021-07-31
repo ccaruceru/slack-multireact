@@ -28,13 +28,20 @@ KEYS = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET",
 with patch.dict(os.environ, {k:"" for k in KEYS}) as mock_env:
     with patch("google.cloud.storage.Client") as mock_storage_client:
         # importing from handlers.py is now possible
-        from multi_reaction_add.handlers import warmup, save_or_display_reactions, add_reactions, handle_token_revocations, handle_uninstallations, update_home_tab
+        from multi_reaction_add.handlers import warmup, save_or_display_reactions, add_reactions,\
+                                                handle_token_revocations, handle_uninstallations,\
+                                                update_home_tab
 
 
+# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
 class TestHandlers(unittest.IsolatedAsyncioTestCase):
+    """Test all methods from handlers.py"""
+
     async def asyncSetUp(self):
+        """Setup tests"""
         self.client = AsyncMock(AsyncWebClient)
-        self.http_args = {"client": self.client, "http_verb": "POST", "api_url": "some-api", "req_args": {}, "headers": {}, "status_code": 200}
+        self.http_args = {"client": self.client, "http_verb": "POST", "api_url": "some-api", "req_args": {},
+            "headers": {}, "status_code": 200}
         patcher_app = patch("multi_reaction_add.handlers.app", spec=AsyncApp)
         self.app = patcher_app.start()
         self.app.client = self.client
@@ -56,7 +63,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.blob.exists.return_value = True
         self.blob.download_as_text.return_value = 'some reactions'
         patcher_bucket = patch("multi_reaction_add.handlers.bucket", spec=Bucket)
-        
+
         self.bucket = patcher_bucket.start()
         self.bucket.blob.return_value = self.blob
 
@@ -64,12 +71,15 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(patcher_app.stop)
 
     async def test_warmup(self):
+        """Test warmup http call"""
         response = await warmup(AsyncMock(spec=web.Request))
         self.assertEqual(response.text, "")
         self.assertEqual(response.status, 200)
 
     @patch("multi_reaction_add.handlers.emoji_operator.get_valid_reactions")
     async def test_save_or_display_reactions(self, get_valid_reactions: AsyncMock):
+        """Test save_or_display_reactions method"""
+
         # test with reactions and enterprise_id
         get_valid_reactions.return_value = ["wave", "smile"]
         await save_or_display_reactions(ack=self.ack,
@@ -160,11 +170,20 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
     @patch("multi_reaction_add.handlers.EmojiOperator.get_user_reactions")
     async def test_add_reactions(self, get_user_reactions: AsyncMock):
+        """Test add_reactions method"""
+
         # test has reactions saved and enterprise id
+        shortcut = {
+            "user": {"id": "uid"},
+            "message_ts": "12345",
+            "channel": {"id": "chid"},
+            "enterprise": None,
+            "team": {"id": "tid"},
+            "trigger_id": "trid"
+        }
         get_user_reactions.return_value = []
         await add_reactions(ack=self.ack,
-            shortcut={"user": {"id": "uid"}, "message_ts": "12345", "channel": {"id": "chid"}, "enterprise": {"id": "eid"},
-                      "team": {"id": "tid"}, "trigger_id": "trid"},
+            shortcut={**shortcut, **{"enterprise": {"id": "eid"}}},
             client=self.client,
             logger=self.logger,
             context=self.context)
@@ -183,8 +202,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
         # test has reactions saved and no enterprise id
         await add_reactions(ack=self.ack,
-            shortcut={"user": {"id": "uid"}, "message_ts": "12345", "channel": {"id": "chid"}, "enterprise": None,
-                      "team": {"id": "tid"}, "trigger_id": "trid"},
+            shortcut=shortcut,
             client=self.client,
             logger=self.logger,
             context=self.context)
@@ -201,8 +219,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         # test has reactions saved and has user reactions
         get_user_reactions.return_value = ["some"]
         await add_reactions(ack=self.ack,
-            shortcut={"user": {"id": "uid"}, "message_ts": "12345", "channel": {"id": "chid"}, "enterprise": None,
-                      "team": {"id": "tid"}, "trigger_id": "trid"},
+            shortcut=shortcut,
             client=self.client,
             logger=self.logger,
             context=self.context)
@@ -212,8 +229,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         get_user_reactions.return_value = []
         self.client.reactions_add.side_effect = SlackApiError(message="", response=None)
         await add_reactions(ack=self.ack,
-            shortcut={"user": {"id": "uid"}, "message_ts": "12345", "channel": {"id": "chid"}, "enterprise": None,
-                      "team": {"id": "tid"}, "trigger_id": "trid"},
+            shortcut=shortcut,
             client=self.client,
             logger=self.logger,
             context=self.context)
@@ -227,18 +243,22 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         # test has no reactions saved
         self.blob.exists.return_value = False
         await add_reactions(ack=self.ack,
-            shortcut={"user": {"id": "uid"}, "message_ts": "12345", "channel": {"id": "chid"}, "enterprise": None,
-                      "team": {"id": "tid"}, "trigger_id": "trid"},
+            shortcut=shortcut,
             client=self.client,
             logger=self.logger,
             context=self.context)
         self.blob.download_as_text.assert_not_called()
         self.client.reactions_add.assert_not_called()
         self.client.views_open.assert_awaited_once_with(trigger_id="trid",
-            view=json.loads('{"type": "modal", "title": {"type": "plain_text", "text": "Multi Reaction Add"}, "close": {"type": "plain_text", "text": "Close"}, "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": "You do not have any reactions set :anguished:\\nType `/multireact <list of emojis>` in the chat to set one."}}]}'))
+            view=json.loads('{"type": "modal", "title": {"type": "plain_text", "text": "Multi Reaction Add"}, "close":'
+                            ' {"type": "plain_text", "text": "Close"}, "blocks": [{"type": "section", "text": {"type":'
+                            ' "mrkdwn", "text": "You do not have any reactions set :anguished:\\nType `/multireact'
+                            ' <list of emojis>` in the chat to set one."}}]}'))
 
     @patch("multi_reaction_add.handlers.delete_users_data")
     async def test_handle_token_revocations(self, delete_users_data: AsyncMock):
+        """Test handle_token_revocations method"""
+
         # test tokens are deleted
         await handle_token_revocations(event={"tokens": {"oauth": ["uid1", "uid2"], "bot": ["bot1", "bot2"]}},
             context=self.context,
@@ -262,12 +282,15 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
     @patch("multi_reaction_add.handlers.emoji_operator.stop_emoji_update")
     async def test_handle_uninstallations(self, stop_emoji_update: AsyncMock):
+        """Test handle_uninstallations method"""
         await handle_uninstallations(context=self.context, logger=self.logger)
         self.installation_store.async_delete_all.assert_awaited_once_with("eid", "tid", True)
         stop_emoji_update.assert_awaited_once()
 
     @patch("multi_reaction_add.handlers.build_home_tab_view")
     async def test_update_home_tab(self, build_home_tab_view: Mock):
+        """Test update_home_tab method"""
+
         # test home tab with urls from 'host'
         build_home_tab_view.return_value = "view"
         request = AsyncBoltRequest(body="", headers={"host": ["localhost"]})
