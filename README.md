@@ -304,6 +304,29 @@ darglint main.py multi_reaction_add
 
 _ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
 
+### Testing
+
+The [tests](tests) folder contains unit tests for the app logic. You can run the tests from commandline with:
+```bash
+python -m unittest discover
+```
+
+Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.8/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):
+```json
+{
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.unittestEnabled": true
+}
+```
+
 ## More
 
 The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is handling requests with [aiohttp](https://docs.aiohttp.org/en/stable/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html) . The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).

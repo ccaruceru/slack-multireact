@@ -1,2 +1,2 @@
 # -*- coding: utf-8 -*-
-"""Init module."""
+"""Tests module."""

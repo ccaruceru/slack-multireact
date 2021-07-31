@@ -262,7 +262,7 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
 
     bot_user_ids = event["tokens"].get("bot")
     if bot_user_ids is not None and len(bot_user_ids) > 0:
-        # delete any bot installation
+        # delete the bot installation
         await app.installation_store.async_delete_bot(context.enterprise_id, context.team_id,
                                                       context.is_enterprise_install)
         logger.info("Revoked bot token for %s", bot_user_ids)
