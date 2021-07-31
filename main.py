@@ -6,7 +6,6 @@ Examples:
     $ gunicorn --bind :3000 --workers 1 --threads 8 --timeout 0 --worker-class aiohttp.GunicornWebWorker main:entrypoint
 
 TODO:
-    * tests
     * code coverage
     * create new client for emoji update to avoid concurrency problems(?)
     * use X-Cloud-Trace-Context to group logs: https://cloud.google.com/appengine/docs/standard/python3/writing-application-logs#writing_structured_logs # pylint: disable=line-too-long

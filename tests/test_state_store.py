@@ -24,6 +24,7 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
         self.storage_client.bucket.return_value = self.bucket
 
         self.logger = logging.getLogger()
+        self.logger.handlers = []
 
         self.bucket_name = "bucket"
         self.state_store = GoogleCloudStorageOAuthStateStore(storage_client=self.storage_client,

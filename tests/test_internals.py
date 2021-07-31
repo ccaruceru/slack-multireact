@@ -83,37 +83,42 @@ class TestInternals(unittest.TestCase):
         self.assertEqual(user_data_key("client_id", None, "team_id", "user_id"), "client_id/none-team_id/user_id")
 
 
-class TestDeleteUserData(unittest.TestCase):
-    def setUp(self):
+class TestDeleteUserData(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
         self.bucket = Mock(spec=Bucket)
         self.blob = Blob(name="name", bucket=self.bucket)
         self.blob.delete = Mock()
         self.bucket.blob = Mock(return_value=self.blob)
 
-    def test_delete_user_data_exists(self):
+    @classmethod
+    def setUpClass(cls):
+        if sys.platform.startswith("win"):
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    async def test_delete_user_data_exists(self):
         self.blob.exists = Mock(return_value=True)
-        asyncio.run(delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id"]))
+        await delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id"])
         self.blob.exists.assert_called_once()
         self.blob.delete.assert_called_once()
 
-    def test_delete_user_data_not_exists(self):
+    async def test_delete_user_data_not_exists(self):
         self.blob.exists = Mock(return_value=False)
-        asyncio.run(delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id"]))
+        await delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id"])
         self.blob.exists.assert_called_once()
         self.blob.delete.assert_not_called()
 
     @patch("multi_reaction_add.internals.user_data_key")
-    def test_delete_user_data_multiple_users(self, mock_get_key):
+    async def test_delete_user_data_multiple_users(self, user_data_key):
         self.blob.exists = Mock(return_value=False)
-        asyncio.run(delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id1", "user_id2"]))
-        mock_get_key.assert_has_calls([call(slack_client_id="client_id",
-                                            enterprise_id="enter_id",
-                                            team_id="team_id",
-                                            user_id="user_id1"),
-                                       call(slack_client_id="client_id",
-                                            enterprise_id="enter_id",
-                                            team_id="team_id",
-                                            user_id="user_id2")])
+        await delete_users_data(self.bucket, "client_id", "enter_id", "team_id", ["user_id1", "user_id2"])
+        user_data_key.assert_has_calls([call(slack_client_id="client_id",
+                                             enterprise_id="enter_id",
+                                             team_id="team_id",
+                                             user_id="user_id1"),
+                                        call(slack_client_id="client_id",
+                                             enterprise_id="enter_id",
+                                             team_id="team_id",
+                                             user_id="user_id2")])
 
 
 class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
@@ -123,6 +128,7 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         self.app = AsyncMock(AsyncApp)
         self.app.client = self.client
         self.logger = logging.getLogger()
+        self.logger.handlers = []
 
     @classmethod
     def setUpClass(cls):
@@ -195,8 +201,8 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(list(map(lambda x: x in emojis, ["longcat", "doge", "partyparrot", "smile", "wink", "flag1", "flag2", "flag3"]))), msg="Could not parse all emojis")
 
     @patch("multi_reaction_add.internals.EmojiOperator._get_reactions_in_team")
-    async def test_update_emoji_list(self, mock_get_reactions):
-        mock_get_reactions.return_value = ["some", "emojis"]
+    async def test_update_emoji_list(self, get_reactions: AsyncMock):
+        get_reactions.return_value = ["some", "emojis"]
         emoji_operator = EmojiOperator()
         self.client.token = "old token"
         try:
@@ -221,7 +227,7 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         emoji_operator = EmojiOperator()
         emoji_operator._emoji_task = Mock(spec=Task)
         emoji_operator._emoji_task.done.return_value = False
-        emoji_operator._all_emojis = ["smile", "wink", "face", "laugh"]
+        emoji_operator._all_emojis = ["smile", "wink", "face", "laugh", "some-emoji", "-emj-", "_emj_", "some_emoji", "+one", "'quote'", "54"]
         
         # check empty input
         emojis = await emoji_operator.get_valid_reactions(text="", client=self.client, app=self.app, logger=self.logger)
@@ -231,9 +237,17 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         emojis = await emoji_operator.get_valid_reactions(text="some text", client=self.client, app=self.app, logger=self.logger)
         self.assertEqual(emojis, [])
 
+        # check no valid emojis
+        emojis = await emoji_operator.get_valid_reactions(text="::::", client=self.client, app=self.app, logger=self.logger)
+        self.assertEqual(emojis, [])
+
         # check valid input
         emojis = await emoji_operator.get_valid_reactions(text=":smile: :wink:", client=self.client, app=self.app, logger=self.logger)
         self.assertEqual(emojis, ["smile", "wink"])
+
+        # check emojis special characters
+        emojis = await emoji_operator.get_valid_reactions(text=":some-emoji: :-emj-: :_emj_: :some_emoji: :+one: :'quote': :54:", client=self.client, app=self.app, logger=self.logger)
+        self.assertEqual(emojis, ["some-emoji", "-emj-", "_emj_", "some_emoji", "+one", "'quote'", "54"])
 
         # check remove duplicates
         emojis = await emoji_operator.get_valid_reactions(text=":smile: :wink: :smile:", client=self.client, app=self.app, logger=self.logger)
