@@ -3,3 +3,6 @@ google-cloud-storage==1.37.1
 gunicorn==20.1.0
 aiohttp==3.7.4.post0
 python-json-logger==2.0.1
+
+# pin the sdk dependency of bolt
+slack-sdk==3.8.0

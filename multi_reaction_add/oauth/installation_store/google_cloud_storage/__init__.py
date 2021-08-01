@@ -2,6 +2,9 @@
 """Store Slack bot install data to a Google Cloud Storage bucket.
 
 Adapted from https://github.com/slackapi/python-slack-sdk/blob/main/slack_sdk/oauth/installation_store/amazon_s3/__init__.py # pylint: disable=line-too-long
+
+Todo:
+    * must use is_enterprise_install argument when deleting
 """
 
 import asyncio
@@ -45,7 +48,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             logger (Logger): Custom logger for logging. Defaults to a new logger for this module.
         """
         self.storage_client = storage_client
-        self.bucket_name = bucket_name
+        self.bucket = self.storage_client.bucket(bucket_name)
         self.client_id = client_id
         self._logger = logger
 
@@ -74,27 +77,16 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         Args:
             installation (Installation): information about the user and the app usage authorization
         """
-        entity: str = json.dumps(installation.to_bot().__dict__)
-        bucket = self.storage_client.bucket(self.bucket_name)
-        self._save_entity(data_type="bot",
-            entity=entity,
-            bucket=bucket,
-            enterprise_id=installation.enterprise_id,
-            team_id=installation.team_id,
-            user_id=None,
-            is_enterprise_install=installation.is_enterprise_install
-        )
-        self.logger.debug("Uploaded %s to Google bucket as bot", entity)
+        # save bot data
+        self.save_bot(installation.to_bot())
 
         # per workspace
         entity: str = json.dumps(installation.__dict__)
         self._save_entity(data_type="installer",
             entity=entity,
-            bucket=bucket,
             enterprise_id=installation.enterprise_id,
             team_id=installation.team_id,
-            user_id=None,
-            is_enterprise_install=installation.is_enterprise_install
+            user_id=None
         )
         self.logger.debug("Uploaded %s to Google bucket as installer", entity)
 
@@ -102,43 +94,58 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         entity: str = json.dumps(installation.__dict__)
         self._save_entity(data_type="installer",
             entity=entity,
-            bucket=bucket,
             enterprise_id=installation.enterprise_id,
             team_id=installation.team_id,
-            user_id=installation.user_id or "none",
-            is_enterprise_install=installation.is_enterprise_install
+            user_id=installation.user_id or "none"
         )
         self.logger.debug("Uploaded %s to Google bucket as installer-%s", entity, installation.user_id)
+
+    async def async_save_bot(self, bot: Bot):
+        """Save bot user authorization.
+
+        Args:
+            bot (Bot): data bout the bot
+        """
+        self.save_bot(bot)
+
+    def save_bot(self, bot: Bot):
+        """Save bot user authorization.
+
+        Args:
+            bot (Bot): data bout the bot
+        """
+        entity: str = json.dumps(bot.__dict__)
+        self._save_entity(data_type="bot",
+            entity=entity,
+            enterprise_id=bot.enterprise_id,
+            team_id=bot.team_id,
+            user_id=None
+        )
+        self.logger.debug("Uploaded %s to Google bucket as bot", entity)
 
     def _save_entity(
         self,
         data_type: str,
         entity: str,
-        bucket: Bucket,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str],
-        is_enterprise_install: Optional[str],
+        user_id: Optional[str]
     ):
         """Saves data to a GCS bucket.
 
         Args:
             data_type (str): data type
             entity (str): data payload
-            bucket (Bucket): GCS Bucket
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
             user_id (Optional[str]): Slack user ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid
         """
         key = self._key(data_type=data_type,
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=user_id,
-            is_enterprise_install=is_enterprise_install
+            user_id=user_id
         )
-        blob = bucket.blob(key)
+        blob = self.bucket.blob(key)
         blob.upload_from_string(entity)
 
     async def async_find_bot(
@@ -170,7 +177,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         *,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        is_enterprise_install: Optional[bool] = False,  # pylint: disable=unused-argument
     ) -> Optional[Bot]:
         """Check if a Slack bot user has been installed in a Slack workspace.
 
@@ -186,12 +193,10 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         key = self._key(data_type="bot",
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=None,
-            is_enterprise_install=is_enterprise_install
+            user_id=None
         )
         try:
-            bucket = self.storage_client.bucket(self.bucket_name)
-            blob = bucket.blob(key)
+            blob = self.bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
             self.logger.debug("Downloaded %s from Google bucket", body)
             data = json.loads(body)
@@ -234,7 +239,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         enterprise_id: Optional[str],
         team_id: Optional[str],
         user_id: Optional[str] = None,
-        is_enterprise_install: Optional[bool] = False,
+        is_enterprise_install: Optional[bool] = False,  # pylint: disable=unused-argument
     ) -> Optional[Installation]:
         """Check if a Slack user has installed the app.
 
@@ -251,12 +256,10 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         key = self._key(data_type="installer",
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=user_id,
-            is_enterprise_install=is_enterprise_install
+            user_id=user_id
         )
         try:
-            bucket = self.storage_client.bucket(self.bucket_name)
-            blob = bucket.blob(key)
+            blob = self.bucket.blob(key)
             body = blob.download_as_text(encoding="utf-8")
             self.logger.debug("Downloaded %s from Google bucket", body)
             data = json.loads(body)
@@ -272,10 +275,10 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
 
     async def async_delete_installation(
         self,
+        *,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        user_id: Optional[str] = None
     ) -> None:
         """Deletes a user's Slack installation data.
 
@@ -283,21 +286,18 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
             user_id (Optional[str]): Slack user ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
         """
         self.delete_installation(enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=user_id,
-            is_enterprise_install=is_enterprise_install
+            user_id=user_id
         )
 
     def delete_installation(
         self,
+        *,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        user_id: Optional[str] = None
     ) -> None:
         """Deletes a user's Slack installation data.
 
@@ -305,56 +305,46 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
             user_id (Optional[str]): Slack user ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
         """
         self._delete_entity(data_type="installer",
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=user_id,
-            is_enterprise_install=is_enterprise_install
+            user_id=user_id
         )
         self.logger.debug("Uninstalled app for enterprise: %s, team: %s, user: %s",
                 enterprise_id, team_id, user_id)
 
     async def async_delete_bot(
         self,
+        *,
         enterprise_id: Optional[str],
-        team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        team_id: Optional[str]
     ) -> None:
         """Deletes Slack bot user install data from the workspace.
 
         Args:
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
         """
         self.delete_bot(enterprise_id=enterprise_id,
-            team_id=team_id,
-            is_enterprise_install=is_enterprise_install,
-        )
+            team_id=team_id)
 
     def delete_bot(
         self,
+        *,
         enterprise_id: Optional[str],
-        team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        team_id: Optional[str]
     ) -> None:
         """Deletes Slack bot user install data from the workspace.
 
         Args:
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
         """
         self._delete_entity(data_type="bot",
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=None,
-            is_enterprise_install=is_enterprise_install
+            user_id=None
         )
         self.logger.debug("Uninstalled bot for enterprise: %s, team: %s", enterprise_id, team_id)
 
@@ -363,8 +353,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         data_type: str,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
+        user_id: Optional[str]
     ) -> None:
         """Deletes an object from a Google Cloud Storage bucket.
 
@@ -373,72 +362,22 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
             user_id (Optional[str]): Slack user ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
         """
         key = self._key(data_type=data_type,
             enterprise_id=enterprise_id,
             team_id=team_id,
-            user_id=user_id,
-            is_enterprise_install=is_enterprise_install
+            user_id=user_id
         )
-        bucket = self.storage_client.bucket(self.bucket_name)
-        blob = bucket.blob(key)
+        blob = self.bucket.blob(key)
         if blob.exists():
             blob.delete()
-
-    async def async_delete_all(
-        self,
-        enterprise_id: Optional[str],
-        team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
-    ):
-        """Deletes all users and bot installation data.
-
-        Args:
-            enterprise_id (Optional[str]): Slack Enterprise Grid ID
-            team_id (Optional[str]): Slack workspace/team ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
-        """
-        asyncio.gather(
-            self.async_delete_bot(enterprise_id=enterprise_id, team_id=team_id,
-                is_enterprise_install=is_enterprise_install
-            ),
-            self.async_delete_installation(
-                enterprise_id=enterprise_id, team_id=team_id, user_id=None,
-                is_enterprise_install=is_enterprise_install
-            )
-        )
-
-    def delete_all(
-        self,
-        enterprise_id: Optional[str],
-        team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
-    ):
-        """Deletes all users and bot installation data.
-
-        Args:
-            enterprise_id (Optional[str]): Slack Enterprise Grid ID
-            team_id (Optional[str]): Slack workspace/team ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
-        """
-        self.delete_bot(enterprise_id=enterprise_id, team_id=team_id,
-            is_enterprise_install=is_enterprise_install
-        )
-        self.delete_installation(enterprise_id=enterprise_id, team_id=team_id, user_id=None,
-            is_enterprise_install=is_enterprise_install
-        )
 
     def _key(
         self,
         data_type: str,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False
+        user_id: Optional[str]
     ) -> str:
         """Helper method to create a path to an object in a GCS bucket.
 
@@ -447,8 +386,6 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
             enterprise_id (Optional[str]): Slack Enterprise Grid ID
             team_id (Optional[str]): Slack workspace/team ID
             user_id (Optional[str]): Slack user ID
-            is_enterprise_install (Optional[str]): True if the Slack app is installed across multiple workspaces in an
-                                                   Enterprise Grid. Defaults to False
 
         Returns:
             str: path to data corresponding to input args
@@ -456,8 +393,6 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         none = "none"
         e_id = enterprise_id or none
         t_id = team_id or none
-        if is_enterprise_install:
-            t_id = none
 
         workspace_path = f"{self.client_id}/{e_id}-{t_id}"
         return (

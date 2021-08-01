@@ -264,10 +264,10 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             context=self.context,
             logger=self.logger)
         self.installation_store.async_delete_installation.assert_has_awaits([
-            call("eid", "tid", "uid1", True),
-            call("eid", "tid", "uid2", True)])
+            call(enterprise_id="eid", team_id="tid", user_id="uid1"),
+            call(enterprise_id="eid", team_id="tid", user_id="uid2")])
         delete_users_data.assert_awaited_once_with(self.bucket, "", "eid", "tid", ["uid1", "uid2"])
-        self.installation_store.async_delete_bot.assert_awaited_once_with("eid", "tid", True)
+        self.installation_store.async_delete_bot.assert_awaited_once_with(enterprise_id="eid", team_id="tid")
 
         self.installation_store.reset_mock()
         delete_users_data.reset_mock()
@@ -284,7 +284,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
     async def test_handle_uninstallations(self, stop_emoji_update: AsyncMock):
         """Test handle_uninstallations method"""
         await handle_uninstallations(context=self.context, logger=self.logger)
-        self.installation_store.async_delete_all.assert_awaited_once_with("eid", "tid", True)
+        self.installation_store.async_delete_all.assert_awaited_once_with(enterprise_id="eid", team_id="tid")
         stop_emoji_update.assert_awaited_once()
 
     @patch("multi_reaction_add.handlers.build_home_tab_view")

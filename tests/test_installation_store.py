@@ -5,7 +5,7 @@ import json
 import time
 import logging
 import unittest
-from unittest.mock import Mock, AsyncMock, call, patch
+from unittest.mock import Mock, call, patch
 from google.cloud.storage.blob import Blob
 from google.cloud.storage.bucket import Bucket
 
@@ -55,42 +55,46 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         save_entity.assert_has_calls([
             call(data_type="bot",
                  entity=json.dumps(self.installation.to_bot().__dict__),
-                 bucket=self.bucket,
                  enterprise_id=self.installation.enterprise_id,
                  team_id=self.installation.team_id,
-                 user_id=None,
-                 is_enterprise_install=self.installation.is_enterprise_install),
+                 user_id=None),
             call(data_type="installer",
                  entity=json.dumps(self.installation.__dict__),
-                 bucket=self.bucket,
                  enterprise_id=self.installation.enterprise_id,
                  team_id=self.installation.team_id,
-                 user_id=None,
-                 is_enterprise_install=self.installation.is_enterprise_install),
+                 user_id=None),
             call(data_type="installer",
                  entity=json.dumps(self.installation.__dict__),
-                 bucket=self.bucket,
                  enterprise_id=self.installation.enterprise_id,
                  team_id=self.installation.team_id,
-                 user_id=self.installation.user_id,
-                 is_enterprise_install=self.installation.is_enterprise_install)
+                 user_id=self.installation.user_id)
         ])
 
+    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
+           "GoogleCloudStorageInstallationStore._save_entity")
+    async def test_async_save_bot(self, save_entity: Mock):
+        """Test async_save_bot method"""
+        await self.installation_store.async_save_bot(bot=self.installation.to_bot())
+        save_entity.assert_called_once_with(data_type="bot",
+            entity=json.dumps(self.installation.to_bot().__dict__),
+            enterprise_id=self.installation.enterprise_id,
+            team_id=self.installation.team_id,
+            user_id=None)
+
     def test_save_entity_and_test_key(self):
-        """Test save_entity and test_key methods"""
+        """Test _save_entity and _key methods"""
         # pylint: disable=protected-access
 
         entity = "some data"
         # test upload user data enterprise install
         self.installation_store._save_entity(data_type="dtype",
             entity=entity,
-            bucket=self.bucket,
             enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
-            user_id=self.installation.user_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            user_id=self.installation.user_id)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-none/dtype-{self.installation.user_id}")
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}"
+            f"/dtype-{self.installation.user_id}")
         self.blob.upload_from_string.assert_called_once_with(entity)
 
         self.bucket.reset_mock()
@@ -98,27 +102,22 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         # test upload user data normal install
         self.installation_store._save_entity(data_type="dtype",
             entity=entity,
-            bucket=self.bucket,
-            enterprise_id=self.installation.enterprise_id,
+            enterprise_id=None,
             team_id=self.installation.team_id,
-            user_id=self.installation.user_id,
-            is_enterprise_install=False)
+            user_id=self.installation.user_id)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/"
-            f"dtype-{self.installation.user_id}")
+            f"{self.client_id}/none-{self.installation.team_id}/dtype-{self.installation.user_id}")
 
         self.bucket.reset_mock()
 
         # test upload bot data
         self.installation_store._save_entity(data_type="dtype",
             entity=entity,
-            bucket=self.bucket,
             enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
-            user_id=None,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            user_id=None)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-none/dtype")
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/dtype")
 
     async def test_async_find_bot(self):
         """Test async_find_bot method"""
@@ -133,7 +132,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             team_id=self.installation.team_id,
             is_enterprise_install=self.installation.is_enterprise_install)
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
-        self.bucket.blob.assert_called_once_with(f"{self.client_id}/{self.installation.enterprise_id}-none/bot")
+        self.bucket.blob.assert_called_once_with(
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/bot")
         self.blob.download_as_text.assert_called_once_with(encoding="utf-8")
         self.assertIsNotNone(bot)
         self.assertEqual(bot.bot_token, "xoxb-token")
@@ -160,7 +160,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
             is_enterprise_install=self.installation.is_enterprise_install)
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-none/installer-{self.installation.user_id}")
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/"
+            f"installer-{self.installation.user_id}")
         self.blob.download_as_text.assert_called_once_with(encoding="utf-8")
         self.assertIsNotNone(installation)
         self.assertEqual(installation.user_id, self.installation.user_id)
@@ -184,11 +185,11 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         self.blob.exists.return_value = True
         await self.installation_store.async_delete_installation(enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
-            user_id=self.installation.user_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            user_id=self.installation.user_id)
         self.storage_client.bucket.assert_called_once_with(self.bucket_name)
         self.bucket.blob.assert_called_once_with(
-            f"{self.client_id}/{self.installation.enterprise_id}-none/installer-{self.installation.user_id}")
+            f"{self.client_id}/{self.installation.enterprise_id}-{self.installation.team_id}/"
+            f"installer-{self.installation.user_id}")
         self.blob.exists.assert_called_once()
         self.blob.delete.assert_called_once()
 
@@ -198,8 +199,7 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
         self.blob.exists.return_value = False
         await self.installation_store.async_delete_installation(enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
-            user_id=self.installation.user_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            user_id=self.installation.user_id)
         self.blob.exists.assert_called_once()
         self.blob.delete.assert_not_called()
 
@@ -208,44 +208,8 @@ class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
     async def test_async_delete_bot(self, delete_entity: Mock):
         """Test async_delete_bot method"""
         await self.installation_store.async_delete_bot(enterprise_id=self.installation.enterprise_id,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            team_id=self.installation.team_id)
         delete_entity.assert_called_once_with(data_type="bot",
             enterprise_id=self.installation.enterprise_id,
             team_id=self.installation.team_id,
-            user_id=None,
-            is_enterprise_install=self.installation.is_enterprise_install)
-
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
-           "GoogleCloudStorageInstallationStore.async_delete_bot")
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
-           "GoogleCloudStorageInstallationStore.async_delete_installation")
-    async def test_async_delete_all(self, async_delete_installation: AsyncMock, async_delete_bot: AsyncMock):
-        """Test async_delete_all method"""
-        await self.installation_store.async_delete_all(enterprise_id=self.installation.enterprise_id,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
-        async_delete_bot.assert_called_once_with(enterprise_id=self.installation.enterprise_id,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
-        async_delete_installation.assert_called_once_with(enterprise_id=self.installation.enterprise_id,
-            user_id=None,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
-
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
-           "GoogleCloudStorageInstallationStore.delete_bot")
-    @patch("multi_reaction_add.oauth.installation_store.google_cloud_storage."
-           "GoogleCloudStorageInstallationStore.delete_installation")
-    def test_delete_all(self, delete_installation: Mock, delete_bot: Mock):
-        """Test delete_all method"""
-        self.installation_store.delete_all(enterprise_id=self.installation.enterprise_id,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
-        delete_bot.assert_called_once_with(enterprise_id=self.installation.enterprise_id,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
-        delete_installation.assert_called_once_with(enterprise_id=self.installation.enterprise_id,
-            user_id=None,
-            team_id=self.installation.team_id,
-            is_enterprise_install=self.installation.is_enterprise_install)
+            user_id=None)

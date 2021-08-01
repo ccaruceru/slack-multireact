@@ -252,8 +252,9 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
         for user_id in user_ids:
             # delete user installation
             await app.installation_store.async_delete_installation(
-                context.enterprise_id, context.team_id, user_id, context.is_enterprise_install
-            )
+                enterprise_id=context.enterprise_id,
+                team_id=context.team_id,
+                user_id=user_id)
             logger.info("Revoked user token for %s", user_id)
 
         # delete user data
@@ -263,8 +264,9 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
     bot_user_ids = event["tokens"].get("bot")
     if bot_user_ids is not None and len(bot_user_ids) > 0:
         # delete the bot installation
-        await app.installation_store.async_delete_bot(context.enterprise_id, context.team_id,
-                                                      context.is_enterprise_install)
+        await app.installation_store.async_delete_bot(
+            enterprise_id=context.enterprise_id,
+            team_id=context.team_id)
         logger.info("Revoked bot token for %s", bot_user_ids)
 
 
@@ -277,7 +279,7 @@ async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logg
                                     additional information
         logger (Logger): optional logger passed to all handlers
     """
-    await app.installation_store.async_delete_all(context.enterprise_id, context.team_id, context.is_enterprise_install)
+    await app.installation_store.async_delete_all(enterprise_id=context.enterprise_id, team_id=context.team_id)
     await emoji_operator.stop_emoji_update()
     logger.info("All tokens were revoked")
 
