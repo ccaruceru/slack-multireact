@@ -6,7 +6,6 @@ Examples:
     $ gunicorn --bind :3000 --workers 1 --threads 8 --timeout 0 --worker-class aiohttp.GunicornWebWorker main:entrypoint
 
 TODO:
-    * code coverage
     * split img to docs and img
     * move main.py to handlers.py (update docs)
     * create new client for emoji update to avoid concurrency problems(?)

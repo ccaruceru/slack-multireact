@@ -12,9 +12,11 @@ from io import StringIO
 from importlib import reload
 from unittest.mock import AsyncMock, Mock, call, patch
 
+from aiohttp.client_exceptions import ClientConnectorError
 from google.cloud.storage.blob import Blob
 from google.cloud.storage.bucket import Bucket
 from slack_bolt.app.async_app import AsyncApp
+from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
@@ -194,6 +196,7 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         """Setup tests"""
         self.client = AsyncMock(AsyncWebClient)
+        self.client.token = None
         self.http_args = {"client": self.client, "http_verb": "POST", "api_url": "some-api", "req_args": {},
             "headers": {}, "status_code": 200}
         self.app = AsyncMock(AsyncApp)
@@ -265,11 +268,15 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
             user_id="user_id2")
         self.assertEqual(emojis, ["heart"])
 
-    async def test_get_reactions_in_team(self):
+    @patch("aiohttp.ClientSession.get")
+    async def test_get_reactions_in_team(self, get: AsyncMock):
         """Test get_reactions_in_team method"""
-
+        mock_context_manager: AsyncMock = get.return_value.__aenter__.return_value
+        mock_context_manager.status = 200
+        mock_context_manager.text.return_value = \
+            '[{"base":"anguished"}, {"base":"sad_face"}, {"base":"clap"}]'
         # sample response: https://api.slack.com/methods/emoji.list
-        response = AsyncSlackResponse(**{**self.http_args, **{"data": {
+        slack_response = AsyncSlackResponse(**{**self.http_args, **{"data": {
             "emoji": {
                 "longcat": "some url",
                 "doge": "alias",
@@ -284,11 +291,39 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         }}})
-        self.client.emoji_list.return_value = response
+        self.client.emoji_list.return_value = slack_response
+
+        # test standard emojis response ok
         emojis = await EmojiOperator._get_reactions_in_team(client=self.client, logger=self.logger)
-        self.assertTrue(all(list(map(lambda x: x in emojis,
-                                     ["longcat", "doge", "partyparrot", "smile", "wink", "flag1", "flag2", "flag3"]))),
-            msg="Could not parse all emojis")
+        self.client.emoji_list.assert_awaited_once_with(include_categories=True)
+        # session.get.assert_called_once_with("https://www.emojidex.com/api/v1/utf_emoji")
+        mock_context_manager.text.assert_awaited_once_with(encoding="utf-8")
+        self.assertEqual(set(emojis),
+                         set(["longcat", "doge", "partyparrot", "smile", "wink", "flag1", "flag2", "flag3",
+                              "anguished", "sad_face", "clap"]),
+                         msg="Could not parse all emojis")
+
+        mock_context_manager.reset_mock()
+        get.reset_mock()
+
+        # test standard emojis response not ok
+        get.return_value.__aenter__.return_value.status = 500
+        emojis = await EmojiOperator._get_reactions_in_team(client=self.client, logger=self.logger)
+        mock_context_manager.text.assert_not_awaited()
+        self.assertEqual(set(emojis),
+                         set(["longcat", "doge", "partyparrot", "smile", "wink", "flag1", "flag2", "flag3"]),
+                         msg="Should not return standard emojis when invalid http request")
+
+        mock_context_manager.reset_mock()
+        get.reset_mock()
+
+        # test standard emojis response exception
+        get.return_value.__aenter__.side_effect = ClientConnectorError(None, Mock())
+        emojis = await EmojiOperator._get_reactions_in_team(client=self.client, logger=self.logger)
+        mock_context_manager.text.assert_not_awaited()
+        self.assertEqual(set(emojis),
+                         set(["longcat", "doge", "partyparrot", "smile", "wink", "flag1", "flag2", "flag3"]),
+                         msg="Should not return standard emojis when connection error")
 
     @patch("multi_reaction_add.internals.EmojiOperator._get_reactions_in_team")
     async def test_update_emoji_list(self, get_reactions: AsyncMock):
@@ -296,6 +331,25 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         get_reactions.return_value = ["some", "emojis"]
         emoji_operator = EmojiOperator()
         self.client.token = "old token"
+
+        # test normal execution
+        try:
+            await asyncio.wait_for(
+                emoji_operator._update_emoji_list(
+                    app=self.app,
+                    token="new token",
+                    logger=self.logger,
+                    sleep=1),
+                timeout=1.5)
+        except asyncio.TimeoutError:
+            pass
+
+        get_reactions.assert_awaited_once_with(self.client, self.logger)
+        self.assertEqual(emoji_operator._all_emojis, ["some", "emojis"])
+        self.assertEqual(self.client.token, "old token")
+
+        # test all_emojis left unchanged on slack api error
+        get_reactions.side_effect = SlackApiError(None, None)
         try:
             await asyncio.wait_for(
                 emoji_operator._update_emoji_list(
@@ -310,6 +364,23 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(emoji_operator._all_emojis, ["some", "emojis"])
         self.assertEqual(self.client.token, "old token")
 
+        # test all_emojis unset on slack api exception
+        emoji_operator._all_emojis = None
+        get_reactions.side_effect = SlackApiError(None, None)
+        try:
+            await asyncio.wait_for(
+                emoji_operator._update_emoji_list(
+                    app=self.app,
+                    token="new token",
+                    logger=self.logger,
+                    sleep=1),
+                timeout=1.5)
+        except asyncio.TimeoutError:
+            pass
+
+        self.assertEqual(emoji_operator._all_emojis, None)
+        self.assertEqual(self.client.token, "old token")
+
     async def test_stop_emoji_thread(self):
         """Test stop_emoji_thread method"""
         emoji_operator = EmojiOperator()
@@ -321,11 +392,13 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.1)  # task will be canceled when it will be scheduled in the event loop
         self.assertTrue(emoji_operator._emoji_task.done())
 
-    async def test_get_valid_reactions(self):
+    @patch("multi_reaction_add.internals.EmojiOperator._get_reactions_in_team")
+    async def test_get_valid_reactions(self, get_reactions: AsyncMock):
         """Test get_valid_reactions method"""
         emoji_operator = EmojiOperator()
         emoji_operator._emoji_task = Mock(spec=Task)
         emoji_operator._emoji_task.done.return_value = False
+        emoji_operator._update_emoji_list = AsyncMock()
         emoji_operator._all_emojis = ["smile", "wink", "face", "laugh", "some-emoji", "-emj-", "_emj_", "some_emoji",
                                       "+one", "'quote'", "54"]
 
@@ -401,3 +474,13 @@ class TestEmojiOperator(unittest.IsolatedAsyncioTestCase):
             app=self.app,
             logger=self.logger)
         self.assertEqual(emojis, ["smile"])
+
+        # check emoji_task is started when finished
+        get_reactions.return_value = ["joy"]
+        emoji_operator._emoji_task.done.return_value = True
+        emojis = await emoji_operator.get_valid_reactions(text=":joy:",
+            client=self.client,
+            app=self.app,
+            logger=self.logger)
+        get_reactions.assert_awaited_once_with(self.client, self.logger)
+        self.assertEqual(emojis, ["joy"])

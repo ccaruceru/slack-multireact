@@ -287,14 +287,14 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
 Then press `F5` to start debugging.
 
 ### Linting
-Use `pylint` to run static code analysis. Code rate should always be 10.00/10.
+Use [pylint](http://pylint.pycqa.org/en/latest/tutorial.html) to run static code analysis. Code rate should always be **10.00/10**.
 ```bash
 pip install pylint
 
 pylint main.py tests multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
 ```
 
-Then use `pydocstyle` and `darglint` to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). No errors or warnings should be reported.
+Then use [pydocstyle](http://www.pydocstyle.org/en/stable/usage.html) and [darglint](https://github.com/terrencepreilly/darglint) to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). **No errors or warnings should be reported.**
 ```bash
 pip install pydocstyle darglint
 
@@ -304,11 +304,23 @@ darglint main.py multi_reaction_add
 
 _ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
 
-### Testing
+### Testing and code coverage
 
 The [tests](tests) folder contains unit tests for the app logic. You can run the tests from commandline with:
 ```bash
 python -m unittest discover
+```
+
+To generate a code coverage report, you need to install [coverage](https://coverage.readthedocs.io/en/coverage-5.5/) package, use it to run the tests and then you'll be able to view the coverage report. The code coverage should always be **99%**.
+```
+# install package
+pip install coverage
+
+# run the tests
+coverage run --source=multi_reaction_add -m unittest discover
+
+# view report
+coverage report -m
 ```
 
 Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.8/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):

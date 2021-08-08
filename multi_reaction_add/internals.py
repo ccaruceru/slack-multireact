@@ -80,12 +80,14 @@ class EmojiOperator:
                 old_token = app.client.token
                 app.client.token = token
                 self._all_emojis = await EmojiOperator._get_reactions_in_team(app.client, logger)
-                app.client.token = old_token
                 logger.info("Emoji update finished")
             except SlackApiError:
                 logger.exception("Failed to update emoji list")
             except (CancelledError, TimeoutError):  # from sleep
                 return
+            finally:
+                app.client.token = old_token
+
 
     @staticmethod
     async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger) -> List[str]:
