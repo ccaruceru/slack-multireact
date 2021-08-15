@@ -2,7 +2,7 @@
 
 Slack bot that allows users to add multiple reactions to a message. Written in Python using [Slack Bolt for Python](https://slack.dev/bolt-python/tutorial/getting-started).
 
-<img src="img/app.png" alt="logo" width="200"/>
+<img src="docs/img/app.png" alt="logo" width="200"/>
 
 # Install
 Open https://king-multireact-slack-app-dev.ew.r.appspot.com/slack/install, click the `Add to Slack` button and allow the application to be installed to your workspace.
@@ -14,16 +14,16 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
 ## Examples
 - `/multireact` to view saved the reactions
 
-    <img src="img/reaction-view.png" alt="reaction-view"/>
+    <img src="resources/img/reaction-view.png" alt="reaction-view"/>
 
 - `/multireact 🤠😎😼➕💯` to set a list of reactions
 
-    <img src="img/reaction-save.png" alt="reaction-save" width="500"/>
+    <img src="resources/img/reaction-save.png" alt="reaction-save" width="500"/>
 
 - Add reactions on a message by going to `More Actions` -> `More message shortcuts` -> `Multireact`
-    1. <img src="img/reaction-none.png" alt="reaction-none" width="350"/>
-    1. <img src="img/reaction-menu.png" alt="reaction-menu" height="300"/>
-    1. <img src="img/reaction-add.png" alt="reaction-add" width="400"/>
+    1. <img src="resources/img/reaction-none.png" alt="reaction-none" width="350"/>
+    1. <img src="resources/img/reaction-menu.png" alt="reaction-menu" height="300"/>
+    1. <img src="resources/img/reaction-add.png" alt="reaction-add" width="400"/>
 
 
 # Google Cloud deployment
@@ -93,8 +93,9 @@ cp app.yaml.template default.yaml
 
 Deploy the service:
 ```bash
-gcloud app deploy default.yaml --project=king-multireact-slack-app-dev
+gcloud app deploy default.yaml --project=king-multireact-slack-app-dev --version=my-version
 ```
+where _my version_ may only contain lowercase letters, digits, and hyphens (e.g. a git tag like _1-20-0_).
 
 Find the service endpoint with:
 ```bash
@@ -170,7 +171,7 @@ _Solution_: Try again in a few seconds.
     - add a short description
     - set the Callback ID to `add_reactions`
 
-    <img src="img/create-shortcut.png" alt="create-shortcut" width="500"/>
+    <img src="docs/img/create-shortcut.png" alt="create-shortcut" width="500"/>
 
 ## Slash commands
 - **Create New Command**
@@ -178,32 +179,32 @@ _Solution_: Try again in a few seconds.
     - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
     - and add a Short description and a usage hint
 
-    <img src="img/create-command.png" alt="create-command" width="500"/>
+    <img src="docs/img/create-command.png" alt="create-command" width="500"/>
 
 ## OAuth & Permissions
 - **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 
-    <img src="img/redirect-url.png" alt="redirect-url" width="500"/>
+    <img src="docs/img/redirect-url.png" alt="redirect-url" width="500"/>
 - Go to **Scopes** section and -> **Bot Token Scopes** and add an OAuth scope for `commands` (might be already added)
 
-    <img src="img/add-scopes.png" alt="add-scope" width="500"/>
+    <img src="docs/img/add-scopes.png" alt="add-scope" width="500"/>
 
 ## Event Subscriptions
 - enable Events
 
-    <img src="img/event-enable.png" alt="event-enable" width="500"/>
+    <img src="docs/img/event-enable.png" alt="event-enable" width="500"/>
 - add `<bot address>/slack/events` under Request URL (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
 - expand **Subscribe to bot events**, click on _Add Bot User Event_ and add the following events:
     - `app_home_opened`
     - `app_uninstalled`
     - `tokens_revoked`
 
-    <img src="img/event-subscription.png" alt="event-subscription" width="500"/>
+    <img src="docs/img/event-subscription.png" alt="event-subscription" width="500"/>
 
 ## App Home
 Enable `Home Tab` and disable everything else.
 
-<img src="img/app-home.png" alt="app-home" width="500"/>
+<img src="docs/img/app-home.png" alt="app-home" width="500"/>
 
 ## Basic Information
 Add relevant description under **Display Information**
@@ -215,7 +216,7 @@ Mandatory environment variables for the App Engine Service are taken from the ap
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 
-    <img src="img/app-credentials.png" alt="app-credentials" width="500"/>
+    <img src="docs/img/app-credentials.png" alt="app-credentials" width="500"/>
 
 Along with other Google Cloud variables:
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user

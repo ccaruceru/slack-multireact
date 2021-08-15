@@ -48,4 +48,4 @@ handlers:
     secure: always
     script: auto
   - url: /img
-    static_dir: img
+    static_dir: resources/img
