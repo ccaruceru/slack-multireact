@@ -12,7 +12,7 @@ service: <service name or "default">
 instance_class: F1
 # Select number of workers based on instance type:
 # https://cloud.google.com/appengine/docs/standard/python3/runtime#entrypoint_best_practices
-entrypoint: gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 --worker-class aiohttp.GunicornWebWorker main:entrypoint
+entrypoint: gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 --worker-class aiohttp.GunicornWebWorker multi_reaction_add.handlers:entrypoint
 # Default env vars:
 # https://cloud.google.com/appengine/docs/standard/python3/runtime#environment_variables
 env_variables:

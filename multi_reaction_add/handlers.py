@@ -24,7 +24,7 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
 from multi_reaction_add.internals import EmojiOperator
-from multi_reaction_add.internals import setup_logger, build_home_tab_view, delete_users_data, user_data_key
+from multi_reaction_add.internals import setup_logger, build_home_tab_view, delete_users_data, user_data_key, check_env
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
 
@@ -58,6 +58,20 @@ app = AsyncApp(
         )
     )
 )
+
+
+async def entrypoint() -> web.Application:
+    """Handles Gunicorn server entrypoint.
+
+    Example:
+        $ gunicorn --bind :3000 --workers 1 --threads 8 --timeout 0 \
+        --worker-class aiohttp.GunicornWebWorker multi_reaction_add.handlers:entrypoint
+
+    Returns:
+        aiohttp.web.Application: The initialized aiohttp server instance
+    """
+    check_env()
+    return app.web_app()
 
 
 async def warmup(request: web.Request) -> web.Response:  # pylint: disable=unused-argument

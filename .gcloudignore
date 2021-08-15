@@ -8,7 +8,7 @@ README.md
 *.yaml
 tests
 .pylintrc
-.pydocstyle
+.pydocstylerc
 htmlcov
 .coverage
 docs
