@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for handlers.py"""
 
-import os
 import json
 import logging
 import unittest
@@ -19,18 +18,14 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
+from tests.helpers import patch_import
 
 
-# necessary OS env vars for handlers.py module
-KEYS = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET",
-        "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME", "SLACK_STATE_GOOGLE_BUCKET_NAME", "USER_DATA_BUCKET_NAME"]
-# patch google storage client call and os env vars
-with patch.dict(os.environ, {k:"" for k in KEYS}) as mock_env:
-    with patch("google.cloud.storage.Client") as mock_storage_client:
-        # importing from handlers.py is now possible
-        from multi_reaction_add.handlers import warmup, save_or_display_reactions, add_reactions,\
-                                                handle_token_revocations, handle_uninstallations,\
-                                                update_home_tab
+with patch_import() as _:
+    # pylint: disable=ungrouped-imports
+    from multi_reaction_add.handlers import warmup, save_or_display_reactions, add_reactions,\
+                                            handle_token_revocations, handle_uninstallations,\
+                                            update_home_tab, entrypoint
 
 
 # pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
@@ -69,6 +64,13 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
         self.addAsyncCleanup(patcher_bucket.stop)
         self.addAsyncCleanup(patcher_app.stop)
+
+    @patch("multi_reaction_add.handlers.check_env")
+    async def test_entrypoint(self, check_env: Mock):
+        """Test entrypoint method"""
+        web_app = await entrypoint()
+        check_env.assert_called_once()
+        self.assertIsNotNone(web_app)
 
     async def test_warmup(self):
         """Test warmup http call"""

@@ -49,7 +49,7 @@ class TestGoogleStateStore(unittest.IsolatedAsyncioTestCase):
         self.bucket.blob.assert_called_once()
         self.assertEqual(self.bucket.blob.call_args.args[0], state)
         self.blob.upload_from_string.assert_called_once()
-        self.assertRegex(self.blob.upload_from_string.call_args.args[0], r"\d{10,}.\d{6,}")
+        self.assertRegex(self.blob.upload_from_string.call_args.args[0], r"\d{10,}.\d{5,}")
 
     async def test_async_comsume(self):
         """Test async_comsume method"""

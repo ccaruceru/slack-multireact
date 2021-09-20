@@ -1,11 +1,40 @@
-# About
+- [About](#about)
+- [Usage](#usage)
+    - [Examples](#examples)
+- [Docker image](#docker-image)
+- [Google Cloud deployment](#google-cloud-deployment)
+    - [Google Storage Buckets](#google-storage-buckets)
+    - [Google App Engine](#google-app-engine)
+        - [Multiple apps or environments](#multiple-apps-or-environments)
+        - [Cleanup old services](#cleanup-old-services)
+        - [Troubleshooting](#troubleshooting)
+- [Slack Application](#slack-application)
+    - [Interactivity and Shortcuts](#interactivity-and-shortcuts)
+    - [Slash commands](#slash-commands)
+    - [OAuth and Permissions](#oauth-and-permissions)
+    - [Event Subscriptions](#event-subscriptions)
+    - [App Home](#app-home)
+    - [Basic Information](#basic-information)
+    - [Distributing the app](#distributing-the-app)
+- [Environment variables](#environment-variables)
+- [Development](#development)
+    - [Debugging with VS Code](#debugging-with-vs-code)
+    - [Lintint](#linting)
+    - [Testing and code coverage](#testing-and-code-coverage)
+    - [More](#more)
 
-Slack bot that allows users to add multiple reactions to a message. Written in Python using [Slack Bolt for Python](https://slack.dev/bolt-python/tutorial/getting-started).
+---
+
+
+# About
 
 <img src="docs/img/app.png" alt="logo" width="200"/>
 
-# Install
-Open https://king-multireact-slack-app-dev.ew.r.appspot.com/slack/install, click the `Add to Slack` button and allow the application to be installed to your workspace.
+A Slack bot which allows users to add multiple reactions to a message at the same time.
+
+> _Written in Python with [Slack Bolt for Python](https://slack.dev/bolt-python/tutorial/getting-started)._
+
+> _Stores data in [Google Cloud Storage](https://cloud.google.com/storage/) buckets_
 
 # Usage
 
@@ -25,30 +54,39 @@ The bot exposes two APIs: a `/multireact` [command](https://slack.com/intl/en-se
     1. <img src="resources/img/reaction-menu.png" alt="reaction-menu" height="300"/>
     1. <img src="resources/img/reaction-add.png" alt="reaction-add" width="400"/>
 
+# Docker image
+
+Run the [ccaruceru/slack-multireact](https://hub.docker.com/r/ccaruceru/slack-multireact) docker image, or build the image locally with `docker build -t multireact .`
+
+Example:
+
+```bash
+docker run -e SLACK_CLIENT_ID=clientid -e SLACK_CLIENT_SECRET=clientsecret -e SLACK_SIGNING_SECRET=signingsecret -e SLACK_INSTALLATION_GOOGLE_BUCKET_NAME=slack-multireact-installation -e SLACK_STATE_GOOGLE_BUCKET_NAME=slack-multireact-oauthstate -e USER_DATA_BUCKET_NAME=slack-multireact-userdata -p 3000:3000 -v /path/to/sa-multireact-key.json:/credentials.json ccaruceru/slack-multireact
+```
+
+For a complete list of required environment variables, see [Environment variables](#environment-variables) section. To find out what permissions you need for the Slack bot, see [Slack Application](#slack-application) section.
 
 # Google Cloud deployment
 
-The deployment process consists in creating two Google Cloud components: A Google App Engine [Service](https://cloud.google.com/appengine) and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
+The deployment process consists in creating two Google Cloud components: A Google App Engine [Service](https://cloud.google.com/appengine) using [Standard](https://cloud.google.com/appengine/docs/the-appengine-environments) environment, and several [Buckets](https://cloud.google.com/storage/docs/key-terms#buckets).
 
-The cloud platform must follow [King's Acceptable Use Policies](https://docs.google.com/document/d/1slOyRUquX3OSIh9uKcWQj68HwQ6czUkRMTtqV2SO9B4/edit#heading=h.j9uihjbnbt87).
+## Google Storage Buckets
 
-## Google Storage buckets
-
-The application requires 3 GCS buckets to store temporary data for the oauth process, app installation data for each user and another bucket for user emoji data.
+The application requires 3 GCS buckets to store temporary data for: the OAuth process, app installation data for each user, user emoji data.
 
 Sample commands to create the buckets:
 ```bash
-gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-userdata
+gsutil mb -c STANDARD -l <region> -b on gs://slack-multireact-userdata
 
-gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-oauthstate
+gsutil mb -c STANDARD -l <region> -b on gs://slack-multireact-oauthstate
 
-gsutil mb -c STANDARD -l europe-west1 -b on gs://multi-reaction-add-installation
+gsutil mb -c STANDARD -l <region> -b on gs://slack-multireact-installation
 ```
 
 Optional: set a retention policy of 1 day for the bucket that will be used for temporary OAuth tokens:
 
 ```bash
-gsutil lifecycle set oauth-bucket-lifecycle.json gs://multi-reaction-add-oauthstate
+gsutil lifecycle set oauth-bucket-lifecycle.json gs://slack-multireact-oauthstate
 ```
 
 ## Google App Engine
@@ -60,23 +98,20 @@ gcloud services enable cloudbuild.googleapis.com
 
 Initialize App Engine app for the project ([docs](https://cloud.google.com/appengine/docs/standard/python3/quickstart#additional_prerequisites)):
 ```bash
-gcloud app create --region=europe-west --project=king-multireact-slack-app-dev
+gcloud app create --region=<region> --project=<project-id>
 ```
+
+**ℹ Note**: It is recommended to stick to the same region as the buckets.
 
 A new service account with the following naming convention is created: `PROJECT_ID@appspot.gserviceaccount.com` ([docs](https://cloud.google.com/appengine/docs/flexible/go/default-service-account#changing_service_account_permissions_)).
 
-e.g.
-```text
-king-multireact-slack-app-dev@appspot.gserviceaccount.com
-```
-
 Grant permissions for each bucket for the App Engine service account:
 ```bash
-gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-userdata
+gsutil iam ch serviceAccount:<project-id>@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://slack-multireact-userdata
 
-gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-oauthstate
+gsutil iam ch serviceAccount:<project-id>@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://slack-multireact-oauthstate
 
-gsutil iam ch serviceAccount:king-multireact-slack-app-dev@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://multi-reaction-add-installation
+gsutil iam ch serviceAccount:<project-id>@appspot.gserviceaccount.com:roles/storage.objectAdmin gs://slack-multireact-installation
 ```
 
 Install required deployment dependencies:
@@ -93,7 +128,7 @@ cp app.yaml.template default.yaml
 
 Deploy the service:
 ```bash
-gcloud app deploy default.yaml --project=king-multireact-slack-app-dev --version=my-version
+gcloud app deploy default.yaml --project=<project-id> --version=my-version
 ```
 where _my version_ may only contain lowercase letters, digits, and hyphens (e.g. a git tag like _1-20-0_).
 
@@ -102,8 +137,8 @@ Find the service endpoint with:
 gcloud app browse --no-launch-browser --service=default
 ```
 
-### Multiple apps/environments
-To deploy the app multiple times in the same App Engine for different purposes (like test, stage and prod environments), copy [app.yaml.template](app.yaml.template) for each app, then change the contents in the `### Change this section` part (and the `service:` key in the file).
+### Multiple apps or environments
+To deploy the bot multiple times in the same App Engine for different purposes (like test, stage and prod environments), copy [app.yaml.template](app.yaml.template) for each app, then change the contents in the `### Change this section` part (and the `service:` key in the file).
 
 e.g.
 ```bash
@@ -111,9 +146,9 @@ cp app.yaml.template default.yaml
 cp app.yaml.template sandbox.yaml
 ```
 
-Deploy the app specifying each service yaml configuration file:
+Deploy the app specifying each yaml configuration file:
 ```bash
-gcloud app deploy default.yaml sandbox.yaml --project=king-multireact-slack-app-dev
+gcloud app deploy default.yaml sandbox.yaml --project=<project-id>
 ```
 
 Find each sevice endpoint with:
@@ -123,7 +158,7 @@ gcloud app browse --no-launch-browser --service=sandbox
 ```
 
 ### Cleanup old services
-Google App Engine is versioning each application by default and creates an endpoint for each version, then all the traffic is routed to the latest deployed service (unless specified otherwise) ([docs](https://cloud.google.com/appengine/docs/standard/python3/an-overview-of-app-engine)).
+Google App Engine is versioning the app for each deployment and creates an endpoint for each version, then all the traffic is routed to the latest deployed service (unless specified otherwise) ([docs](https://cloud.google.com/appengine/docs/standard/python3/an-overview-of-app-engine)).
 
 List all running versions:
 ```bash
@@ -143,13 +178,13 @@ sandbox  20210521t204813  0.00           2021-05-21T20:50:18+02:00  SERVING
 sandbox  20210521t210402  1.00           2021-05-21T21:06:18+02:00  SERVING
 ```
 
-The versions where the `TRAFFIC_SPLIT` is 1 represent the latest deployed application. It is safe to delete the ones where `TRAFFIC_SPLIT` is 0.
+The versions where the `TRAFFIC_SPLIT` is 1.00 represent the latest deployed application. It is safe to delete the ones where `TRAFFIC_SPLIT` is 0.
 
 ```bash
 gcloud app versions delete <version>
 ```
 
-One liner to delete all versions where `TRAFFIC_SPLIT` is 0:
+Or use a one liner to delete all versions where `TRAFFIC_SPLIT` is 0:
 ```bash
 gcloud app versions delete $(gcloud app versions list --filter=TRAFFIC_SPLIT=0 --format="value(version.id)" | sort -u | tr '\n' ' ') --quiet
 ```
@@ -161,10 +196,12 @@ ERROR: (gcloud.app.deploy) NOT_FOUND: Unable to retrieve P4SA: [service-23699952
 ```
 _Solution_: Try again in a few seconds.
 
-# Create Slack application
+# Slack Application
 
-## Interactivity & Shortcuts
-- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
+The following sections must be set:
+
+## Interactivity and Shortcuts
+- Add `<bot address>/slack/events` to **Request URL** (_can be added after the Service has been deployed_)
 - **Create New Shortcut**
     - with **On messages** type
     - set the Name to `Multireact`
@@ -176,13 +213,13 @@ _Solution_: Try again in a few seconds.
 ## Slash commands
 - **Create New Command**
     - Command is `/multireact`
-    - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
+    - Request URL is `<bot address>/slack/events` (_can be added after the Service has been deployed_)
     - and add a Short description and a usage hint
 
     <img src="docs/img/create-command.png" alt="create-command" width="500"/>
 
-## OAuth & Permissions
-- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
+## OAuth and Permissions
+- **Add New Redirect URL** and use `<bot address>/slack/oauth_redirect` (_can be added after the Service has been deployed_)
 
     <img src="docs/img/redirect-url.png" alt="redirect-url" width="500"/>
 - Go to **Scopes** section and -> **Bot Token Scopes** and add an OAuth scope for `commands` (might be already added)
@@ -193,7 +230,7 @@ _Solution_: Try again in a few seconds.
 - enable Events
 
     <img src="docs/img/event-enable.png" alt="event-enable" width="500"/>
-- add `<bot address>/slack/events` under Request URL (_can be added after the Service has been deployed - see [Google App Engine](#google-app-engine) section_)
+- add `<bot address>/slack/events` under Request URL (_can be added after the Service has been deployed_)
 - expand **Subscribe to bot events**, click on _Add Bot User Event_ and add the following events:
     - `app_home_opened`
     - `app_uninstalled`
@@ -209,51 +246,56 @@ Enable `Home Tab` and disable everything else.
 ## Basic Information
 Add relevant description under **Display Information**
 
+## Distributing the app
+
+After all information has been set and the application is deployed, users are now able to authorize and use the bot by heading to `<bot address>/slack/install` endpoint in their browsers (e.g. _https://my-multireact-app.com/slack/install_). Administrators should distribute the bot address to the users once the application is up and running (see [Docker image](#docker-image) or [Google Cloud deployment](#google-cloud-deployment) sections).
+
 # Environment variables
 
-Mandatory environment variables for the App Engine Service are taken from the app's **Basic Information** page:
+Mandatory environment variables for the App Engine Service are taken from the app's **Basic Information** page (see [Slack Application](#slack-application) section):
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 
     <img src="docs/img/app-credentials.png" alt="app-credentials" width="500"/>
 
-Along with other Google Cloud variables:
-- SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user
-- SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state
-- USER_DATA_BUCKET_NAME: bucket for user emoji data
+Along with [Google Cloud Storage](https://cloud.google.com/storage/) variables:
+- GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets (e.g. sa-multireact-key.json). Not required if the bot is running inside Google Cloud.
+- SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user (e.g. slack-multireact-installation)
+- SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state (e.g. slack-multireact-oauthstate)
+- USER_DATA_BUCKET_NAME: bucket for user emoji data (e.g. slack-multireact-userdata)
+
+Extra variables used by the Docker image:
+- GUNICORN_PORT: specify a server socket to bind ([docs](https://docs.gunicorn.org/en/stable/run.html)). Defaults to 3000.
+- GUNICORN_WORKERS: the number of worker processes ([docs](https://docs.gunicorn.org/en/stable/run.html)). Defaults to 1.
+- GUNICORN_THREADS: number of threads to process multiple requests ([docs](https://docs.gunicorn.org/en/stable/design.html#how-many-threads)). Defaults to 8.
 
 Optional:
 - LOG_LEVEL: log verosity. defaults to `INFO`
 
-# Local development
+# Development
 To start development for this app install **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
 - `pip install -r requirements.txt`
 - in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
-    - **ℹ Note**: sometimes the VPN client will prevent ngrok from establishing a connection
-- setup a slack application according to [Create Slack application](#create-slack-application) section, using _ngrok generated https address_
+    - **ℹ Note**: if there is a VPN client running, ngrok might fail to establish a connection
+- setup a slack application according to [Slack Application](#slack-application) section, using _ngrok generated https address_
     - the HTTP endpoints created by Bolt framework are:
         - **/slack/events** - used as _Request URL_ for incoming slack API requests (commands and shortcuts)
         - **/slack/install** - simple interface which allows a user to install the app to a workspace and start the OAuth flow
-        - **/slack/oauth_redirect** - endpoint used by Slack to complete the OAuth flow (the _Redirect URL_ under [OAuth & Permissions](#oauth-&-permissions) section)
-- create GCS buckets described in [Google Storage buckets](#google-storage-buckets)
+        - **/slack/oauth_redirect** - endpoint used by Slack to complete the OAuth flow (the _Redirect URL_ under [OAuth and Permissions](#oauth-and-permissions) section)
+- create GCS buckets as described in [Google Storage buckets](#google-storage-buckets)
 - create a service account, grant access to the Google Cloud Storage buckets (like in [Google App Engine](#google-app-engine) section), and generate a key for the account:
 ```bash
 # create svc account
-gcloud iam service-accounts create sa-multireact-dev --description="SVC account with access to GCS buckets" --display-name="SA GCS dev" --project=king-multireact-slack-app-dev
-
+gcloud iam service-accounts create sa-multireact-dev --description="svc account with access to GCS buckets" --display-name="SA Multireact Dev" --project=<project-id>
 # get svc account full name
 gcloud iam service-accounts list
-
-# grant access to buckets
-
+# <grant access to buckets>
 # generate key
-gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-dev@king-multireact-slack-app-dev.iam.gserviceaccount.com
+gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-dev@<project-id>.iam.gserviceaccount.com
 ```
-- set environment variables according to [Environment variables](#environment-variables) section, along with:
-    - GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets (e.g. sa-multireact-key.json)
-    - PORT: optional; defaults to 3000
-- `python main.py` to run the app
+- set environment variables according to [Environment variables](#environment-variables) section. Optionally, set a PORT number (defaults to 3000)
+- `python -m multi_reaction_add` to run the app
 - go to "_ngrok generated https address_/slack/install" to install the app to the workspace and start interracting like in the [Usage](#usage) section.
 
 ## Debugging with VS Code
@@ -267,7 +309,7 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
             "name": "Python: Slack Bot",
             "type": "python",
             "request": "launch",
-            "program": "main.py",
+            "module": "multi_reaction_add",
             "console": "integratedTerminal",
             "env": {
                 "SLACK_CLIENT_ID": "clientid",
@@ -276,9 +318,9 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
                 "LOG_LEVEL": "INFO",
                 "PORT": "3000",
                 "GOOGLE_APPLICATION_CREDENTIALS": "sa-multireact-key.json",
-                "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME": "multi-reaction-add-installation",
-                "SLACK_STATE_GOOGLE_BUCKET_NAME": "multi-reaction-add-oauthstate",
-                "USER_DATA_BUCKET_NAME": "multi-reaction-add-userdata"
+                "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME": "slack-multireact-installation",
+                "SLACK_STATE_GOOGLE_BUCKET_NAME": "slack-multireact-oauthstate",
+                "USER_DATA_BUCKET_NAME": "slack-multireact-userdata"
             }
         }
     ]
@@ -287,32 +329,34 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
 
 Then press `F5` to start debugging.
 
-### Linting
-Use [pylint](http://pylint.pycqa.org/en/latest/tutorial.html) to run static code analysis. Code rate should always be **10.00/10**.
+## Linting
+Use [pylint](http://pylint.pycqa.org/en/latest/tutorial.html) to run static code analysis. **Code rate should always be 10.00/10**.
 ```bash
 pip install pylint
 
-pylint main.py tests multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
+pylint tests multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
 ```
 
 Then use [pydocstyle](http://www.pydocstyle.org/en/stable/usage.html) and [darglint](https://github.com/terrencepreilly/darglint) to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). **No errors or warnings should be reported.**
 ```bash
 pip install pydocstyle darglint
 
-pydocstyle main.py multi_reaction_add
-darglint main.py multi_reaction_add
+pydocstyle multi_reaction_add
+darglint multi_reaction_add
 ```
 
 _ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
 
-### Testing and code coverage
+_ℹ Note: Darglint takes about 5 minutes to finish._
+
+## Testing and code coverage
 
 The [tests](tests) folder contains unit tests for the app logic. You can run the tests from commandline with:
 ```bash
 python -m unittest discover
 ```
 
-To generate a code coverage report, you need to install [coverage](https://coverage.readthedocs.io/en/coverage-5.5/) package, use it to run the tests and then you'll be able to view the coverage report. The code coverage should always be **99%**.
+To generate a code coverage report, you need to install [coverage](https://coverage.readthedocs.io/en/coverage-5.5/) package, use it to run the tests and then you'll be able to view the coverage report. **The code coverage should always be 99%**.
 ```
 # install package
 pip install coverage
@@ -342,6 +386,8 @@ Use the following `.vscode/settings.json` configuration to setup testing with [u
 
 ## More
 
-The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is handling requests with [aiohttp](https://docs.aiohttp.org/en/stable/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html) . The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
+The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is handling requests with [aiohttp](https://docs.aiohttp.org/en/stable/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html). The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
+
+The application exposes two additional http endpoints: `/img` for serving static images, and `/_ah/warmup` for GAE [warmup requests](https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests).
 
 More info about how to setup a local environment can be found [here](https://slack.dev/bolt-python/tutorial/getting-started), documentation about the Slack Bolt for Python APIs can be found [here](https://slack.dev/bolt-python/concepts), and more examples on how to use the Bolt framework can be found [here](https://github.com/slackapi/bolt-python/tree/main/examples).

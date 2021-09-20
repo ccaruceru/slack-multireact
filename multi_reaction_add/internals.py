@@ -94,7 +94,7 @@ class EmojiOperator:
         """Gets the custom + standard emojis available in a Slack workspace, and community emojis too.
 
         It returns the basic community emojis from emojidex.com because they are not included in the
-        Slack API response. https://king.slack.com/help/requests/3477073
+        Slack API response.
 
         Args:
             client (AsyncWebClient): an initialized slack WebClient for API calls
