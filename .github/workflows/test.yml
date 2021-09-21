@@ -51,7 +51,7 @@ jobs:
     - name: Darglint
       run: darglint multi_reaction_add
 
-  test:
+  coverage:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -64,7 +64,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install coverage
-    - name: Tests and coverage
+    - name: Tests
       run: |
         coverage run --source=multi_reaction_add -m unittest discover
         coverage report -m --fail-under=99
