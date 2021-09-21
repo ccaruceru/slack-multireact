@@ -1,3 +1,5 @@
+# Table of contents
+
 - [About](#about)
 - [Usage](#usage)
     - [Examples](#examples)
@@ -35,6 +37,8 @@ A Slack bot which allows users to add multiple reactions to a message at the sam
 > _Written in Python with [Slack Bolt for Python](https://slack.dev/bolt-python/tutorial/getting-started)._
 
 > _Stores data in [Google Cloud Storage](https://cloud.google.com/storage/) buckets_
+
+![Tests](https://github.com/ccaruceru/slack-multireact/actions/workflows/test.yml/badge.svg?branch=master) ![Docker Image Version (latest by date)](https://img.shields.io/docker/v/ccaruceru/slack-multireact?arch=amd64&label=Docker%20image&sort=date)
 
 # Usage
 
