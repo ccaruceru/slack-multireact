@@ -229,6 +229,9 @@ The following sections must be set:
 - Go to **Scopes** section and -> **Bot Token Scopes** and add an OAuth scope for `commands` (might be already added)
 
     <img src="docs/img/add-scopes.png" alt="add-scope" width="500"/>
+- Press the `Opt in` button to add extra security for the application
+
+    <img src="docs/img/token-rotation.jpg" alt="token-rotation" width="500"/>
 
 ## Event Subscriptions
 - enable Events
