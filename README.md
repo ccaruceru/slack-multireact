@@ -276,7 +276,7 @@ Optional variables can be set for the underlying [Uvicorn ASGI](https://www.uvic
 - UVICORN_HOST: network interfaces to bind the server. Default to `0.0.0.0`.
 
 # Development
-Make sure you have at least Python version **3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
+Make sure you have at least Python version **3.10**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
 - `pip install -r requirements.txt`
 - in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
     - **ℹ Note**: if there is a VPN client running, ngrok might fail to establish a connection
@@ -370,7 +370,7 @@ coverage run --source=multi_reaction_add -m unittest discover
 coverage report -m
 ```
 
-Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.8/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):
+Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.10/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):
 ```json
 {
     "python.testing.unittestArgs": [
@@ -388,7 +388,7 @@ Use the following `.vscode/settings.json` configuration to setup testing with [u
 
 ## More
 
-The app uses [ASGI](https://asgi.readthedocs.io/en/latest/) with [starlette](https://www.starlette.io/) and the application is handling requests with [uvicorn](https://www.uvicorn.org/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html). The choice was mostly based on the results shown in this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
+The app uses [ASGI](https://asgi.readthedocs.io/en/latest/) with [starlette](https://www.starlette.io/) and the application is handling requests with [uvicorn](https://www.uvicorn.org/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.10/library/asyncio.html). The choice was mostly based on the results shown in this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
 
 The application exposes two additional http endpoints: `/img` for serving static images, and `/_ah/warmup` for GAE [warmup requests](https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests).
 

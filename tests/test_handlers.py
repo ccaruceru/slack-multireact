@@ -287,7 +287,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(build_home_tab_view.call_args, call())
         self.client.views_publish.assert_awaited_once_with(user_id="uid", view="view")
 
-    @patch.dict("os.environ", {"SLACK_CLIENT_ID": "id", "SLACK_CLIENT_SECRET": "secret"})
+    @patch.dict("os.environ", {"SLACK_CLIENT_ID": "", "SLACK_CLIENT_SECRET": ""})
     async def test_main_endpoints(self):
         """Test if main route endpoints do respond"""
         async def receive():
