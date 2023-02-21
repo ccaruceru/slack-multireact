@@ -6,26 +6,26 @@ import logging
 import unittest
 from unittest.mock import Mock, AsyncMock, patch, call
 
-from aiohttp import web
 from google.cloud.storage.blob import Blob
 from google.cloud.storage.bucket import Bucket
-from slack_bolt.app.async_app import AsyncApp
+from slack_bolt.async_app import AsyncApp
+from slack_bolt.adapter.starlette.async_handler import AsyncSlackRequestHandler
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.async_context import AsyncBoltContext
 from slack_bolt.context.respond.async_respond import AsyncRespond
 from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+from starlette.requests import Request
 
-from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from tests.helpers import patch_import
 
 
 with patch_import() as _:
     # pylint: disable=ungrouped-imports
     from multi_reaction_add.handlers import warmup, save_or_display_reactions, add_reactions,\
-                                            handle_token_revocations, handle_uninstallations,\
-                                            update_home_tab, entrypoint
+                                            handle_token_revocations, update_home_tab, events,\
+                                            install, oauth_redirect
 
 
 # pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
@@ -37,12 +37,6 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.client = AsyncMock(AsyncWebClient)
         self.http_args = {"client": self.client, "http_verb": "POST", "api_url": "some-api", "req_args": {},
             "headers": {}, "status_code": 200}
-        patcher_app = patch("multi_reaction_add.handlers.app", spec=AsyncApp)
-        self.app = patcher_app.start()
-        self.app.client = self.client
-        self.installation_store = AsyncMock(spec=GoogleCloudStorageInstallationStore)
-        self.app.installation_store = self.installation_store
-
         self.ack = AsyncMock(AsyncAck)
         self.respond = AsyncMock(AsyncRespond)
         self.logger = logging.getLogger()
@@ -63,22 +57,15 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.bucket.blob.return_value = self.blob
 
         self.addAsyncCleanup(patcher_bucket.stop)
-        self.addAsyncCleanup(patcher_app.stop)
-
-    @patch("multi_reaction_add.handlers.check_env")
-    async def test_entrypoint(self, check_env: Mock):
-        """Test entrypoint method"""
-        web_app = await entrypoint()
-        check_env.assert_called_once()
-        self.assertIsNotNone(web_app)
+        # self.addAsyncCleanup(patcher_app.stop)
 
     async def test_warmup(self):
         """Test warmup http call"""
-        response = await warmup(AsyncMock(spec=web.Request))
-        self.assertEqual(response.text, "")
-        self.assertEqual(response.status, 200)
+        response = await warmup(None)
+        self.assertEqual(response.body, b"")
+        self.assertEqual(response.status_code, 200)
 
-    @patch("multi_reaction_add.handlers.emoji_operator.get_valid_reactions")
+    @patch("multi_reaction_add.handlers.EmojiOperator.get_valid_reactions")
     async def test_save_or_display_reactions(self, get_valid_reactions: AsyncMock):
         """Test save_or_display_reactions method"""
 
@@ -90,7 +77,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             respond=self.respond,
             logger=self.logger)
         self.ack.assert_awaited_once()
-        get_valid_reactions.assert_awaited_once_with(":wave: :smile:", self.client, self.app, self.logger)
+        get_valid_reactions.assert_awaited_once_with(":wave: :smile:", self.client, self.logger)
         self.bucket.blob.assert_called_once_with("/eid-tid/uid")
         self.blob.upload_from_string.assert_called_once_with("wave smile")
         self.respond.assert_awaited_once()
@@ -115,7 +102,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         get_valid_reactions.return_value = [f":{i}:" for i in range(30)]
         await save_or_display_reactions(ack=self.ack,
             client=self.client,
-            command={"user_id": "uid", "team_id": "tid", "text": [f":{i}:" for i in range(24)]},
+            command={"user_id": "uid", "team_id": "tid", "text": " ".join([f":{i}:" for i in range(24)])},
             respond=self.respond,
             logger=self.logger)
         self.blob.upload_from_string.assert_not_called()
@@ -260,34 +247,19 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
     @patch("multi_reaction_add.handlers.delete_users_data")
     async def test_handle_token_revocations(self, delete_users_data: AsyncMock):
         """Test handle_token_revocations method"""
-
         # test tokens are deleted
         await handle_token_revocations(event={"tokens": {"oauth": ["uid1", "uid2"], "bot": ["bot1", "bot2"]}},
             context=self.context,
             logger=self.logger)
-        self.installation_store.async_delete_installation.assert_has_awaits([
-            call(enterprise_id="eid", team_id="tid", user_id="uid1"),
-            call(enterprise_id="eid", team_id="tid", user_id="uid2")])
         delete_users_data.assert_awaited_once_with(self.bucket, "", "eid", "tid", ["uid1", "uid2"])
-        self.installation_store.async_delete_bot.assert_awaited_once_with(enterprise_id="eid", team_id="tid")
 
-        self.installation_store.reset_mock()
         delete_users_data.reset_mock()
 
         # test no tokens are deleted
         await handle_token_revocations(event={"tokens": {"oauth": [], "bot": []}},
             context=self.context,
             logger=self.logger)
-        self.installation_store.async_delete_installation.assert_not_awaited()
         delete_users_data.assert_not_awaited()
-        self.installation_store.assert_not_awaited()
-
-    @patch("multi_reaction_add.handlers.emoji_operator.stop_emoji_update")
-    async def test_handle_uninstallations(self, stop_emoji_update: AsyncMock):
-        """Test handle_uninstallations method"""
-        await handle_uninstallations(context=self.context, logger=self.logger)
-        self.installation_store.async_delete_all.assert_awaited_once_with(enterprise_id="eid", team_id="tid")
-        stop_emoji_update.assert_awaited_once()
 
     @patch("multi_reaction_add.handlers.build_home_tab_view")
     async def test_update_home_tab(self, build_home_tab_view: Mock):
@@ -295,24 +267,13 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
 
         # test home tab with urls from 'host'
         build_home_tab_view.return_value = "view"
-        request = AsyncBoltRequest(body="", headers={"host": ["localhost"]})
+        request = AsyncBoltRequest(body="", headers={"host": ["host1"]})
         await update_home_tab(client=self.client,
             event={"user": "uid"},
             logger=self.logger,
             request=request)
-        build_home_tab_view.assert_called_once_with(app_url="https://localhost")
+        build_home_tab_view.assert_called_once_with(app_url="https://host1")
         self.client.views_publish.assert_awaited_once_with(user_id="uid", view="view")
-
-        build_home_tab_view.reset_mock()
-        self.client.reset_mock()
-
-        # test home tab with urls from 'Host'
-        request = AsyncBoltRequest(body="", headers={"Host": ["localhost"]})
-        await update_home_tab(client=self.client,
-            event={"user": "uid"},
-            logger=self.logger,
-            request=request)
-        build_home_tab_view.assert_called_once_with(app_url="https://localhost")
 
         build_home_tab_view.reset_mock()
         self.client.reset_mock()
@@ -325,3 +286,23 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             request=request)
         self.assertEqual(build_home_tab_view.call_args, call())
         self.client.views_publish.assert_awaited_once_with(user_id="uid", view="view")
+
+    @patch.dict("os.environ", {"SLACK_CLIENT_ID": "", "SLACK_CLIENT_SECRET": ""})
+    async def test_main_endpoints(self):
+        """Test if main route endpoints do respond"""
+        async def receive():
+            return {"type": "http.request", "body": b""}
+
+        app = AsyncApp()
+        app._async_middleware_list = []  # pylint: disable=protected-access
+        app.oauth_flow.settings.state_validation_enabled = False
+        app_handler = AsyncSlackRequestHandler(app)
+        with patch("multi_reaction_add.handlers.app_handler", app_handler):
+            with patch.multiple(app.oauth_flow, run_installation=AsyncMock(), store_installation=AsyncMock()):
+                tests = [("POST", "/slack/events", "", events), ("GET", "/slack/install", "", install),
+                         ("GET", "/slack/oauth_redirect", b"code=123", oauth_redirect)]
+                for method, path, query, function in tests:
+                    scope = {"type": "http", "method": method, "path": path, "headers": {}, "query_string": query}
+                    request = Request(scope=scope, receive=receive)
+                    response = await function(request)
+                    self.assertEqual(response.status_code, 200)

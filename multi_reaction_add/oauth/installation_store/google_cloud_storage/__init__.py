@@ -7,14 +7,12 @@ Todo:
     * must use is_enterprise_install argument when deleting
 """
 
-import asyncio
 import json
 import logging
 from logging import Logger
 from typing import Optional
 
 from google.cloud.storage import Client
-from google.cloud.storage.bucket import Bucket
 from slack_sdk.oauth.installation_store.async_installation_store import AsyncInstallationStore
 from slack_sdk.oauth.installation_store.installation_store import InstallationStore
 from slack_sdk.oauth.installation_store.models.bot import Bot

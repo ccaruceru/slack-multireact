@@ -229,6 +229,9 @@ The following sections must be set:
 - Go to **Scopes** section and -> **Bot Token Scopes** and add an OAuth scope for `commands` (might be already added)
 
     <img src="docs/img/add-scopes.png" alt="add-scope" width="500"/>
+- Press the `Opt in` button to add extra security for the application
+
+    <img src="docs/img/token-rotation.jpg" alt="token-rotation" width="500"/>
 
 ## Event Subscriptions
 - enable Events
@@ -269,16 +272,14 @@ Along with [Google Cloud Storage](https://cloud.google.com/storage/) variables:
 - SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state (e.g. slack-multireact-oauthstate)
 - USER_DATA_BUCKET_NAME: bucket for user emoji data (e.g. slack-multireact-userdata)
 
-Extra variables used by the Docker image:
-- GUNICORN_PORT: specify a server socket to bind ([docs](https://docs.gunicorn.org/en/stable/run.html)). Defaults to 3000.
-- GUNICORN_WORKERS: the number of worker processes ([docs](https://docs.gunicorn.org/en/stable/run.html)). Defaults to 1.
-- GUNICORN_THREADS: number of threads to process multiple requests ([docs](https://docs.gunicorn.org/en/stable/design.html#how-many-threads)). Defaults to 8.
-
-Optional:
-- LOG_LEVEL: log verosity. defaults to `INFO`
+Optional variables can be set for the underlying [Uvicorn ASGI](https://www.uvicorn.org/settings/), like:
+- UVICORN_PORT: specify a server socket to bind. Defaults to `3000`.
+- UVICORN_WORKERS: the number of worker processes. Defaults to `1`.
+- UVICORN_LOG_LEVEL: log verosity. defaults to `info`.
+- UVICORN_HOST: network interfaces to bind the server. Default to `0.0.0.0`.
 
 # Development
-To start development for this app install **Python 3.8**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
+Make sure you have at least Python version **3.10**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
 - `pip install -r requirements.txt`
 - in a sepparate terminal run `ngrok http 3000` and take a note of the _ngrok generated https address_
     - **ℹ Note**: if there is a VPN client running, ngrok might fail to establish a connection
@@ -299,7 +300,7 @@ gcloud iam service-accounts list
 gcloud iam service-accounts keys create sa-multireact-key.json --iam-account=sa-multireact-dev@<project-id>.iam.gserviceaccount.com
 ```
 - set environment variables according to [Environment variables](#environment-variables) section. Optionally, set a PORT number (defaults to 3000)
-- `python -m multi_reaction_add` to run the app
+- `uvicorn multi_reaction_add.handlers:api --port 3000 --reload` to run the app
 - go to "_ngrok generated https address_/slack/install" to install the app to the workspace and start interracting like in the [Usage](#usage) section.
 
 ## Debugging with VS Code
@@ -313,18 +314,18 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
             "name": "Python: Slack Bot",
             "type": "python",
             "request": "launch",
-            "module": "multi_reaction_add",
+            "module": "uvicorn",
+            "args": ["multi_reaction_add.handlers:api", "--port", "3000", "--no-access-log"],
             "console": "integratedTerminal",
             "env": {
                 "SLACK_CLIENT_ID": "clientid",
                 "SLACK_CLIENT_SECRET": "clientsecret",
                 "SLACK_SIGNING_SECRET": "signingsecret",
-                "LOG_LEVEL": "INFO",
-                "PORT": "3000",
                 "GOOGLE_APPLICATION_CREDENTIALS": "sa-multireact-key.json",
                 "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME": "slack-multireact-installation",
-                "SLACK_STATE_GOOGLE_BUCKET_NAME": "slack-multireact-oauthstate",
-                "USER_DATA_BUCKET_NAME": "slack-multireact-userdata"
+                "SLACK_STATE_GOOGLE_BUCKET_NAME": "slack-multireact-installation",
+                "USER_DATA_BUCKET_NAME": "slack-multireact-installation",
+                "UVICORN_LOG_LEVEL": "info"
             }
         }
     ]
@@ -351,7 +352,7 @@ darglint multi_reaction_add
 
 _ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
 
-_ℹ Note: Darglint takes about 5 minutes to finish._
+_ℹ Note: Darglint takes a couple of minutes to finish._
 
 ## Testing and code coverage
 
@@ -372,7 +373,7 @@ coverage run --source=multi_reaction_add -m unittest discover
 coverage report -m
 ```
 
-Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.8/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):
+Use the following `.vscode/settings.json` configuration to setup testing with [unittest](https://docs.python.org/3.10/library/unittest.html) for [VS Code](https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework):
 ```json
 {
     "python.testing.unittestArgs": [
@@ -390,7 +391,7 @@ Use the following `.vscode/settings.json` configuration to setup testing with [u
 
 ## More
 
-The [WSGI](https://en.wikipedia.org/wiki/Web_Server_Gateway_Interface) server of choice is [gunicorn](https://docs.gunicorn.org/en/stable/) and the application is handling requests with [aiohttp](https://docs.aiohttp.org/en/stable/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.8/library/asyncio.html). The choice was made based on the results shown on this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
+The app uses [ASGI](https://asgi.readthedocs.io/en/latest/) with [starlette](https://www.starlette.io/) and the application is handling requests with [uvicorn](https://www.uvicorn.org/), which works on top of Python's concurrent library [asyncio](https://docs.python.org/3.10/library/asyncio.html). The choice was mostly based on the results shown in this [post](https://stackabuse.com/asynchronous-vs-synchronous-python-performance-analysis/#summarizingresults).
 
 The application exposes two additional http endpoints: `/img` for serving static images, and `/_ah/warmup` for GAE [warmup requests](https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests).
 

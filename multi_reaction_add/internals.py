@@ -5,15 +5,12 @@ import os
 import re
 import sys
 import json
-import asyncio
 import logging
-from asyncio import CancelledError, TimeoutError, Task
+from datetime import datetime, timedelta
 from typing import List, Optional, TextIO
 from collections import OrderedDict
 from aiohttp import ClientSession, ClientConnectorError, ClientResponseError
 
-from slack_bolt.async_app import AsyncApp
-from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 from google.cloud.storage.bucket import Bucket
 from pythonjsonlogger import jsonlogger
@@ -23,14 +20,11 @@ class EmojiOperator:
     """Handles emojis validations and updates, and has an in-memory cache for them.
 
     Attributes:
-        all_emojis (List[str]): a list of all valid emoji codes
-        emoji_task (Task): reference to a Task which updates `all_emojis`
+        _all_emojis (List[str]): a list of all valid emoji codes
+        _last_updated (datetime): when was `all_emojis` last updated
     """
-
-    def __init__(self) -> None:
-        """Creates a new instance."""
-        self._all_emojis: List[str] = []
-        self._emoji_task: Task = None
+    _all_emojis: List[str] = []
+    _last_updated = datetime.now()
 
     @staticmethod
     async def get_user_reactions(client: AsyncWebClient, channel_id: str, message_ts: str, user_id: str) -> List[str]:
@@ -63,31 +57,6 @@ class EmojiOperator:
                 return [r["name"] for r in response["comment"]["reactions"] if user_id in r["users"]]
 
         return []
-
-    async def _update_emoji_list(self, app: AsyncApp, token: str, logger: logging.Logger, sleep: int = 60) -> None:
-        """Updates the global emojis list with latest from slack api.
-
-        Args:
-            app (AsyncApp): Bolt application instance
-            token (str): bot token to make api calls
-            logger (logging.Logger): logger for printing messages
-            sleep (int): amount of seconds to sleep. Defaults to 60
-        """
-        while True:
-            await asyncio.sleep(sleep)
-            try:
-                logger.info("Start emoji update")
-                old_token = app.client.token
-                app.client.token = token
-                self._all_emojis = await EmojiOperator._get_reactions_in_team(app.client, logger)
-                logger.info("Emoji update finished")
-            except SlackApiError:
-                logger.exception("Failed to update emoji list")
-            except (CancelledError, TimeoutError):  # from sleep
-                return
-            finally:
-                app.client.token = old_token
-
 
     @staticmethod
     async def _get_reactions_in_team(client: AsyncWebClient, logger: logging.Logger) -> List[str]:
@@ -124,18 +93,16 @@ class EmojiOperator:
 
         return list(set(custom_emojis + builtin_emojis + standard_emojis))
 
+    @staticmethod
     async def get_valid_reactions(
-        self,
         text: str,
         client: AsyncWebClient,
-        app: AsyncApp,
         logger: logging.Logger) -> List[str]:
         """Returns the valid emojis available in user's workspace, if any.
 
         Args:
             text (str): message from the user which contains possible emojis
             client (AsyncWebClient): an initialized slack WebClient for API calls
-            app (AsyncApp): the Bolt application instance
             logger (Logger): a logger to print information
 
         Returns:
@@ -158,22 +125,16 @@ class EmojiOperator:
             else:
                 simple_reactions.append(reaction)
 
-        if not self._emoji_task or self._emoji_task.done():
-            self._all_emojis = await EmojiOperator._get_reactions_in_team(client, logger)
-            # start a thread to update all emojis for future use
-            self._emoji_task = asyncio.create_task(
-                coro=self._update_emoji_list(app, client.token, logger), name="EmojiUpdate")
+        # update cache when is empty or older than 1min
+        if not EmojiOperator._all_emojis or (EmojiOperator._last_updated < datetime.now() - timedelta(minutes=1)):
+            EmojiOperator._all_emojis = await EmojiOperator._get_reactions_in_team(client, logger)
+            EmojiOperator._last_updated = datetime.now()
 
-        valid_reactions = [r for r in simple_reactions if r in self._all_emojis]
+        valid_reactions = [r for r in simple_reactions if r in EmojiOperator._all_emojis]
         valid_reactions += [
-            r for r in reactions_with_modifier if r[:r.find("::")] in self._all_emojis]
+            r for r in reactions_with_modifier if r[:r.find("::")] in EmojiOperator._all_emojis]
         # return reactions back in order
         return [r for r in orig_reactions if r in valid_reactions]
-
-    async def stop_emoji_update(self) -> None:
-        """Stop the thread which updates `self._all_emojis`."""
-        if self._emoji_task and not self._emoji_task.done():
-            self._emoji_task.cancel()
 
 
 async def delete_users_data(
@@ -330,13 +291,13 @@ def check_env() -> None:
     """Checks if mandatory environment variables are set.
 
     Raises:
-        Exception: when one or more environment variables are missing
+        RuntimeError: when one or more environment variables are missing
     """
     keys = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_INSTALLATION_GOOGLE_BUCKET_NAME",
             "SLACK_STATE_GOOGLE_BUCKET_NAME", "USER_DATA_BUCKET_NAME"]
-    missing = [key for key in keys if key not in os.environ.keys()]
+    missing = [key for key in keys if key not in os.environ]
     if missing:
-        raise Exception(f"The following environment variables are not set: {missing}")
+        raise RuntimeError(f"The following environment variables are not set: {missing}")
 
 
 def setup_logger(stream: TextIO = sys.stderr) -> logging.Logger:
@@ -346,10 +307,10 @@ def setup_logger(stream: TextIO = sys.stderr) -> logging.Logger:
         stream (TextIO): a text stream where to write the logs. Defaults to sys.stderr
 
     Returns:
-        logging.Logger: a reference to the root logger. Can be ignored.
+        logging.Logger: a reference to the root logger.
     """
     logger = logging.getLogger()
-    logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    logger.setLevel(os.environ.get("UVICORN_LOG_LEVEL", "info").upper())
     log_handler = logging.StreamHandler(stream)
     formatter = CloudLoggingJsonFormatter("%(timestamp)s %(severity)s %(funcName)s %(component)s %(message)s")
     log_handler.setFormatter(formatter)
@@ -358,7 +319,12 @@ def setup_logger(stream: TextIO = sys.stderr) -> logging.Logger:
 
 
 class CloudLoggingJsonFormatter(jsonlogger.JsonFormatter):
-    """A json log formatter suitable for Google Cloud Logging reporting."""
+    """A json log formatter suitable for Google Cloud Logging reporting.
+
+    Todo:
+        * use X-Cloud-Trace-Context to group logs:
+        https://cloud.google.com/appengine/docs/standard/python3/writing-application-logs#writing_structured_logs
+    """
 
     def add_fields(self, log_record: OrderedDict, record: logging.LogRecord, message_dict: dict) -> None:
         """Override super.add_fields to add extra fields required for Cloud Logs.

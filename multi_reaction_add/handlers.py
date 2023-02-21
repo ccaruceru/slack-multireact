@@ -12,9 +12,9 @@ import os
 import logging
 from asyncio import sleep
 
-from aiohttp import web
 from google.cloud.storage import Client
 from slack_bolt.async_app import AsyncApp
+from slack_bolt.adapter.starlette.async_handler import AsyncSlackRequestHandler
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.respond.async_respond import AsyncRespond
@@ -22,25 +22,32 @@ from slack_bolt.context.async_context import AsyncBoltContext
 from slack_bolt.request.async_request import AsyncBoltRequest
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+from starlette.applications import Starlette
+from starlette.staticfiles import StaticFiles
+from starlette.requests import Request
+from starlette.responses import Response, PlainTextResponse
+from starlette.routing import Route, Mount
 
 from multi_reaction_add.internals import EmojiOperator
 from multi_reaction_add.internals import setup_logger, build_home_tab_view, delete_users_data, user_data_key, check_env
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 from multi_reaction_add.oauth.state_store.google_cloud_storage import GoogleCloudStorageOAuthStateStore
 
+# ------------
+# Bolt section
+# ------------
 
-# setup json logging for google cloud
-setup_logger()
-# initialize the Google Storage client
-storage_client = Client()
+check_env()  # check for env vars
+setup_logger()  # setup json logging for google cloud
+storage_client = Client()  # initialize the Google Storage client
 bucket = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])
 slack_client_id = os.environ["SLACK_CLIENT_ID"]
-# initialize an emoji helper object
-emoji_operator = EmojiOperator()
 # initialize the app with the OAuth configuration
 app = AsyncApp(
     signing_secret=os.environ["SLACK_SIGNING_SECRET"],
     oauth_settings=AsyncOAuthSettings(
+        # token_rotation_expiration_minutes=1000000,  # enable this to test token rotation
+        install_page_rendering_enabled=False,
         client_id=slack_client_id,
         client_secret=os.environ["SLACK_CLIENT_SECRET"],
         scopes=["commands", "emoji:read"],  # scopes needed for bot operations
@@ -58,34 +65,7 @@ app = AsyncApp(
         )
     )
 )
-
-
-async def entrypoint() -> web.Application:
-    """Handles Gunicorn server entrypoint.
-
-    Example:
-        $ gunicorn --bind :3000 --workers 1 --threads 8 --timeout 0 \
-        --worker-class aiohttp.GunicornWebWorker multi_reaction_add.handlers:entrypoint
-
-    Returns:
-        aiohttp.web.Application: The initialized aiohttp server instance
-    """
-    check_env()
-    return app.web_app()
-
-
-async def warmup(request: web.Request) -> web.Response:  # pylint: disable=unused-argument
-    """Handles Google App Engine warmup requests.
-
-    https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests
-
-    Args:
-        request (web.Request): the aiohttp request
-
-    Returns:
-        web.Response: an aiohttp response
-    """
-    return web.Response(text="", status=200)
+app_handler = AsyncSlackRequestHandler(app)
 
 
 # https://api.slack.com/interactivity/slash-commands, https://slack.dev/bolt-python/concepts#commands
@@ -121,9 +101,9 @@ async def save_or_display_reactions(
                         user_id=user_id)
     blob = bucket.blob(key)
 
-    if "text" in command:  # this command has some text in it => will save new reactions
+    if "text" in command and command["text"].strip():  # this command has some text in it => will save new reactions
         # sanitize the mesage from user and select only reactions
-        reactions = await emoji_operator.get_valid_reactions(command["text"], client, app, logger)
+        reactions = await EmojiOperator.get_valid_reactions(command["text"], client, logger)
         if len(reactions) > 23:
             # inform user when reaction limit reached
             # https://slack.com/intl/en-se/help/articles/206870317-Use-emoji-reactions
@@ -249,7 +229,6 @@ async def add_reactions(
         logger.info("User %s has no reactions", user_id)
 
 
-@app.event("tokens_revoked")
 async def handle_token_revocations(event: dict, context: AsyncBoltContext, logger: logging.Logger) -> None:
     """Deletes the token given by the OAuth process when a user removes the app.
 
@@ -263,39 +242,9 @@ async def handle_token_revocations(event: dict, context: AsyncBoltContext, logge
     """
     user_ids = event["tokens"].get("oauth")
     if user_ids is not None and len(user_ids) > 0:
-        for user_id in user_ids:
-            # delete user installation
-            await app.installation_store.async_delete_installation(
-                enterprise_id=context.enterprise_id,
-                team_id=context.team_id,
-                user_id=user_id)
-            logger.info("Revoked user token for %s", user_id)
-
-        # delete user data
         await delete_users_data(bucket, slack_client_id, context.enterprise_id, context.team_id, user_ids)
         logger.info("Deleted user data for %s", user_ids)
 
-    bot_user_ids = event["tokens"].get("bot")
-    if bot_user_ids is not None and len(bot_user_ids) > 0:
-        # delete the bot installation
-        await app.installation_store.async_delete_bot(
-            enterprise_id=context.enterprise_id,
-            team_id=context.team_id)
-        logger.info("Revoked bot token for %s", bot_user_ids)
-
-
-@app.event("app_uninstalled")
-async def handle_uninstallations(context: AsyncBoltContext, logger: logging.Logger) -> None:
-    """Revokes all tokens for current slack application.
-
-    Args:
-        context (AsyncBoltContext): a dictionary added to all handlers which can be used to enrich events with
-                                    additional information
-        logger (Logger): optional logger passed to all handlers
-    """
-    await app.installation_store.async_delete_all(enterprise_id=context.enterprise_id, team_id=context.team_id)
-    await emoji_operator.stop_emoji_update()
-    logger.info("All tokens were revoked")
 
 
 @app.event("app_home_opened")
@@ -318,8 +267,6 @@ async def update_home_tab(
     # https://cloud.google.com/appengine/docs/standard/python/how-requests-are-routed#domain_name_is_included_in_the_request_data
     if "host" in request.headers and len(request.headers["host"]) > 0:
         view = build_home_tab_view(app_url=f"https://{request.headers['host'][0]}")
-    elif "Host" in request.headers and len(request.headers["Host"]) > 0:
-        view = build_home_tab_view(app_url=f"https://{request.headers['Host'][0]}")
     else:
         view = build_home_tab_view()
 
@@ -330,7 +277,72 @@ async def update_home_tab(
     logger.info("User %s opened home tab", user_id)
 
 
-# add the warmup route for aiohttp
-app.web_app().add_routes([web.get("/_ah/warmup", warmup)])
-# add static /img route for local runs/debugging
-app.web_app().add_routes([web.static("/img", "resources/img")])
+app.event("tokens_revoked")(app.default_tokens_revoked_event_listener(), handle_token_revocations)
+app.event("app_uninstalled")(app.default_app_uninstalled_event_listener())
+
+# -----------------
+# Starlette section
+# -----------------
+
+
+async def events(request: Request) -> Response:
+    """Handles Bolt app http requests.
+
+    Args:
+        request (Request): HTTP request
+
+    Returns:
+        Response: ASGI response
+    """
+    return await app_handler.handle(request)
+
+
+async def install(request: Request) -> Response:
+    """Handles Slack app installation http request.
+
+    Args:
+        request (Request): HTTP request
+
+    Returns:
+        Response: ASGI response
+    """
+    return await app_handler.handle(request)
+
+
+async def oauth_redirect(request: Request) -> Response:
+    """Handles OAuth authorization http request.
+
+    Args:
+        request (Request): HTTP request
+
+    Returns:
+        Response: ASGI response
+    """
+    return await app_handler.handle(request)
+
+
+async def warmup(request: Request) -> Response:  # pylint: disable=unused-argument
+    """Handle Google App Engine warmup requests.
+
+    https://cloud.google.com/appengine/docs/standard/python3/configuring-warmup-requests
+
+    Args:
+        request (Request): HTTP request
+
+    Returns:
+        Response: ASGI response
+    """
+    return PlainTextResponse("")
+
+
+# https://github.com/slackapi/bolt-python/blob/main/examples/starlette/async_oauth_app.py
+api = Starlette(
+    routes=[
+        Route("/slack/events", endpoint=events, methods=["POST"]),
+        Route("/slack/install", endpoint=install, methods=["GET"]),
+        Route("/slack/oauth_redirect", endpoint=oauth_redirect, methods=["GET"]),
+        # add the warmup route and static img route
+        Route('/_ah/warmup', endpoint=warmup, methods=["GET"]),
+        Mount('/img', app=StaticFiles(directory="resources/img")),
+    ]
+)

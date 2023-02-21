@@ -15,3 +15,5 @@ Dockerfile
 .dockerignore
 LICENSE
 .github
+.venv
+.DS_Store
