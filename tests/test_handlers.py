@@ -28,7 +28,7 @@ with patch_import() as _:
                                             install, oauth_redirect
 
 
-# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
+# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init,missing-param-doc,missing-return-doc,missing-return-type-doc
 class TestHandlers(unittest.IsolatedAsyncioTestCase):
     """Test all methods from handlers.py"""
 
@@ -272,7 +272,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             event={"user": "uid"},
             logger=self.logger,
             request=request)
-        build_home_tab_view.assert_called_once_with(app_url="https://host1")
+        build_home_tab_view.assert_called_once_with("/multireact", app_url="https://host1")
         self.client.views_publish.assert_awaited_once_with(user_id="uid", view="view")
 
         build_home_tab_view.reset_mock()
@@ -284,7 +284,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             event={"user": "uid"},
             logger=self.logger,
             request=request)
-        self.assertEqual(build_home_tab_view.call_args, call())
+        build_home_tab_view.assert_called_once_with("/multireact")
         self.client.views_publish.assert_awaited_once_with(user_id="uid", view="view")
 
     @patch.dict("os.environ", {"SLACK_CLIENT_ID": "", "SLACK_CLIENT_SECRET": ""})

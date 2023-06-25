@@ -14,7 +14,7 @@ from slack_sdk.oauth.installation_store.models.installation import Installation
 
 from multi_reaction_add.oauth.installation_store.google_cloud_storage import GoogleCloudStorageInstallationStore
 
-# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
+# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init,missing-param-doc
 class TestGoogleInstallationStore(unittest.IsolatedAsyncioTestCase):
     """Tests for GoogleCloudStorageInstallationStore"""
 

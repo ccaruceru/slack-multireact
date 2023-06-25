@@ -259,24 +259,25 @@ After all information has been set and the application is deployed, users are no
 
 # Environment variables
 
-Mandatory environment variables for the App Engine Service are taken from the app's **Basic Information** page (see [Slack Application](#slack-application) section):
+Mandatory environment variables for the App Engine Service / Docker image are taken from the app's **Basic Information** page (see [Slack Application](#slack-application) section):
 - SLACK_CLIENT_ID: the **Client ID** 
 - SLACK_CLIENT_SECRET: the **Client Secret**
 - SLACK_SIGNING_SECRET: the **Signing Secret**
 
     <img src="docs/img/app-credentials.png" alt="app-credentials" width="500"/>
 
-Along with [Google Cloud Storage](https://cloud.google.com/storage/) variables:
 - GOOGLE_APPLICATION_CREDENTIALS: path to a json file with credentials for an account with permissions to GCS buckets (e.g. sa-multireact-key.json). Not required if the bot is running inside Google Cloud.
 - SLACK_INSTALLATION_GOOGLE_BUCKET_NAME: name of a bucket used to store Slack app install data per user (e.g. slack-multireact-installation)
 - SLACK_STATE_GOOGLE_BUCKET_NAME: bucket name for storing temporary OAuth state (e.g. slack-multireact-oauthstate)
 - USER_DATA_BUCKET_NAME: bucket for user emoji data (e.g. slack-multireact-userdata)
 
-Optional variables can be set for the underlying [Uvicorn ASGI](https://www.uvicorn.org/settings/), like:
-- UVICORN_PORT: specify a server socket to bind. Defaults to `3000`.
-- UVICORN_WORKERS: the number of worker processes. Defaults to `1`.
-- UVICORN_LOG_LEVEL: log verosity. defaults to `info`.
-- UVICORN_HOST: network interfaces to bind the server. Default to `0.0.0.0`.
+Optional environment variables:
+- SLACK_SLASH_COMMAND: specifies what is the slash command the app should listen for. Useful for multiple deployment in the same Slack workspace. Defaults to `/multireact`
+- [Uvicorn ASGI](https://www.uvicorn.org/settings/) variables, like:
+    - UVICORN_PORT: specify a server socket to bind. Defaults to `3000`.
+    - UVICORN_WORKERS: the number of worker processes. Defaults to `1`.
+    - UVICORN_LOG_LEVEL: log verosity. defaults to `info`.
+    - UVICORN_HOST: network interfaces to bind the server. Default to `0.0.0.0`.
 
 # Development
 Make sure you have at least Python version **3.10**, [ngrok](https://ngrok.com/download) and [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), then run:
@@ -335,24 +336,12 @@ Use the following `.vscode/launch.json` file to setup a debug configuration for 
 Then press `F5` to start debugging.
 
 ## Linting
-Use [pylint](http://pylint.pycqa.org/en/latest/tutorial.html) to run static code analysis. **Code rate should always be 10.00/10**.
+Use [pylint](http://pylint.pycqa.org/en/latest/tutorial.html) to run static code analysis and check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). **Code rate should always be 10.00/10**.
 ```bash
 pip install pylint
 
 pylint tests multi_reaction_add multi_reaction_add/oauth/installation_store/google_cloud_storage multi_reaction_add/oauth/state_store/google_cloud_storage
 ```
-
-Then use [pydocstyle](http://www.pydocstyle.org/en/stable/usage.html) and [darglint](https://github.com/terrencepreilly/darglint) to check if the code has well formatted docstrings according to [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). **No errors or warnings should be reported.**
-```bash
-pip install pydocstyle darglint
-
-pydocstyle multi_reaction_add
-darglint multi_reaction_add
-```
-
-_ℹ Note: Darglint errors can be "cryptic" and you should check the [documentation](https://pythonrepo.com/repo/terrencepreilly-darglint-python-linters-style-checkers#error-codes) for the error code explanations._
-
-_ℹ Note: Darglint takes a couple of minutes to finish._
 
 ## Testing and code coverage
 

@@ -22,7 +22,7 @@ from multi_reaction_add.internals import check_env, setup_logger, build_home_tab
                                          delete_users_data, EmojiOperator
 
 
-# pylint: disable=attribute-defined-outside-init
+# pylint: disable=attribute-defined-outside-init,missing-param-doc
 class TestCheckEnv(unittest.TestCase):
     """Test env vars checker"""
 
@@ -87,7 +87,7 @@ class TestInternals(unittest.TestCase):
         """Test build_home_tab method"""
 
         # check home tab with no urls
-        home_tab_dict = build_home_tab_view()
+        home_tab_dict = build_home_tab_view("/multireact")
         home_tab_json = json.dumps(home_tab_dict, separators=(",", ":"))
         self.assertEqual(home_tab_json, '{"type":"home","blocks":[{"type":"header","text":{"type":"plain_text","text":'
                                         '"Setting emojis :floppy_disk:","emoji":true}},{"type":"section","text":{"type"'
@@ -102,7 +102,7 @@ class TestInternals(unittest.TestCase):
                                         ' to find it."}}]}')
 
         # check home tab with urls
-        home_tab_dict = build_home_tab_view(app_url="localhost")
+        home_tab_dict = build_home_tab_view("/multireact", app_url="localhost")
         home_tab_json = json.dumps(home_tab_dict, separators=(",", ":"))
         self.assertEqual(home_tab_json, '{"type":"home","blocks":[{"type":"header","text":{"type":"plain_text","text":'
                                         '"Setting emojis :floppy_disk:","emoji":true}},{"type":"section","text":{"type"'

@@ -1,4 +1,6 @@
 # https://www.codeac.io/documentation/pylint-configuration.html
+[MAIN]
+load-plugins=pylint.extensions.docparams,pylint.extensions.docstyle
 
 [DESIGN]
 max-args=8
@@ -11,3 +13,11 @@ min-similarity-lines=6
 
 [VARIABLES]
 redefining-builtins-modules=asyncio
+
+# https://pylint.readthedocs.io/en/v2.17.4/user_guide/checkers/extensions.html#parameter-documentation-checker
+[tool.pylint.parameter_documentation]
+accept-no-param-doc = false
+accept-no-raise-doc = false
+accept-no-return-doc = false
+accept-no-yields-doc = false
+default-docstring-type = google

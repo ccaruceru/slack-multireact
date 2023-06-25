@@ -180,10 +180,11 @@ def user_data_key(slack_client_id: str, enterprise_id: Optional[str], team_id: s
             f"{slack_client_id}/none-{team_id}/{user_id}")
 
 
-def build_home_tab_view(app_url: str = None) -> dict:
+def build_home_tab_view(slash_command: str, app_url: str = None) -> dict:
     """Builds a Slack Block Kit view for the App Home Tab.
 
     Args:
+        slash_command (str): Slack slash command the app responds to.
         app_url (str): Application URL to add additional pictures in the view. Defaults to None.
 
     Returns:
@@ -204,7 +205,7 @@ def build_home_tab_view(app_url: str = None) -> dict:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "Type `/multireact <list of emojis>` in any chat to set a list of emojis for later usage."
+                "text": f"Type `{slash_command} <list of emojis>` in any chat to set a list of emojis for later usage."
             }
         }
     ])
@@ -226,7 +227,7 @@ def build_home_tab_view(app_url: str = None) -> dict:
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": "You can view what you saved any moment by typing `/multireact` in any chat."
+            "text": f"You can view what you saved any moment by typing `{slash_command}` in any chat."
         }
     })
     if app_url:

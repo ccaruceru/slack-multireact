@@ -2,7 +2,7 @@
 
 FROM python:3.10-alpine3.17 as builder
 
-RUN apk add gcc==12.2.1_git20220924-r4 musl-dev==1.2.3-r4
+RUN apk add gcc==12.2.1_git20220924-r4 musl-dev==1.2.3-r5
 
 COPY requirements.txt .
 
