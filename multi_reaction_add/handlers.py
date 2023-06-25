@@ -42,6 +42,7 @@ setup_logger()  # setup json logging for google cloud
 storage_client = Client()  # initialize the Google Storage client
 bucket = storage_client.bucket(os.environ["USER_DATA_BUCKET_NAME"])
 slack_client_id = os.environ["SLACK_CLIENT_ID"]
+slash_command = os.environ.get("SLACK_SLASH_COMMAND", "/multireact")
 # initialize the app with the OAuth configuration
 app = AsyncApp(
     signing_secret=os.environ["SLACK_SIGNING_SECRET"],
@@ -69,7 +70,7 @@ app_handler = AsyncSlackRequestHandler(app)
 
 
 # https://api.slack.com/interactivity/slash-commands, https://slack.dev/bolt-python/concepts#commands
-@app.command("/multireact")
+@app.command(slash_command)
 async def save_or_display_reactions(
         ack: AsyncAck,
         client: AsyncWebClient,
@@ -121,7 +122,7 @@ async def save_or_display_reactions(
             reactions = " ".join(reactions)
             blob.upload_from_string(reactions)
             await respond("Great! Your new reactions are saved :sunglasses: "
-                          "Type `/multireact` to see them at any time.")
+                          f"Type `{slash_command}` to see them at any time.")
             logger.info("User %s saved %s", user_id, reactions)
 
     else:  # otherwise, report to user any reactions they have
@@ -129,12 +130,12 @@ async def save_or_display_reactions(
             reactions = blob.download_as_text(encoding="utf-8")
             reactions = " ".join([f":{r}:" for r in reactions.split(" ")])
             await respond(f"Your current reactions are: {reactions}. "
-                           "Type `/multireact <new list of emojis>` to change them.")
+                          f"Type `{slash_command} <new list of emojis>` to change them.")
             logger.info("User %s loaded %s", user_id, reactions)
 
         else:  # or say that user doesn't have any
             await respond("You do not have any reactions set :anguished:\n"
-                          "Type `/multireact <list of emojis>` to set one.")
+                          f"Type `{slash_command} <list of emojis>` to set one.")
             logger.info("User %s has no reactions", user_id)
 
 
@@ -220,7 +221,7 @@ async def add_reactions(
                         "text": {
                             "type": "mrkdwn",
                             "text": ("You do not have any reactions set :anguished:\n"
-                                     "Type `/multireact <list of emojis>` in the chat to set one.")
+                                     f"Type `{slash_command} <list of emojis>` in the chat to set one.")
                         }
                     }
                 ]
@@ -266,9 +267,9 @@ async def update_home_tab(
     user_id = event["user"]
     # https://cloud.google.com/appengine/docs/standard/python/how-requests-are-routed#domain_name_is_included_in_the_request_data
     if "host" in request.headers and len(request.headers["host"]) > 0:
-        view = build_home_tab_view(app_url=f"https://{request.headers['host'][0]}")
+        view = build_home_tab_view(slash_command, app_url=f"https://{request.headers['host'][0]}")
     else:
-        view = build_home_tab_view()
+        view = build_home_tab_view(slash_command)
 
     await client.views_publish(
         user_id=user_id,  # Use the user ID associated with the event
