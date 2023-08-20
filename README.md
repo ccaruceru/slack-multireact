@@ -138,7 +138,7 @@ where _my version_ may only contain lowercase letters, digits, and hyphens (e.g.
 
 Find the service endpoint with:
 ```bash
-gcloud app browse --no-launch-browser --service=default
+gcloud app browse --no-launch-browser --service=default --project=<project-id>
 ```
 
 ### Multiple apps or environments
