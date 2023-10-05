@@ -5,7 +5,9 @@ Attributes:
     storage_client (Client): client used to access Google Cloud Storage
     bucket (google.cloud.storage.bucket.Bucket): a GCS bucket for user data
     slack_client_id (str): Current Slack application client id
+    slash_command (str): What Slack slash command should the app listen to
     app (AsyncApp): Connector between Slack API and application logic
+    app_handler (AsyncSlackRequestHandler): ASGI compatible request handler
 """
 
 import os

@@ -2,9 +2,6 @@
 """Store Slack bot install data to a Google Cloud Storage bucket.
 
 Adapted from https://github.com/slackapi/python-slack-sdk/blob/main/slack_sdk/oauth/installation_store/amazon_s3/__init__.py # pylint: disable=line-too-long
-
-Todo:
-    * must use is_enterprise_install argument when deleting
 """
 
 import json
@@ -175,7 +172,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         *,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,  # pylint: disable=unused-argument
+        is_enterprise_install: Optional[bool] = False,
     ) -> Optional[Bot]:
         """Check if a Slack bot user has been installed in a Slack workspace.
 
@@ -190,6 +187,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         """
         key = self._key(data_type="bot",
             enterprise_id=enterprise_id,
+            is_enterprise_install=is_enterprise_install,
             team_id=team_id,
             user_id=None
         )
@@ -237,7 +235,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         enterprise_id: Optional[str],
         team_id: Optional[str],
         user_id: Optional[str] = None,
-        is_enterprise_install: Optional[bool] = False,  # pylint: disable=unused-argument
+        is_enterprise_install: Optional[bool] = False,
     ) -> Optional[Installation]:
         """Check if a Slack user has installed the app.
 
@@ -253,6 +251,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         """
         key = self._key(data_type="installer",
             enterprise_id=enterprise_id,
+            is_enterprise_install=is_enterprise_install,
             team_id=team_id,
             user_id=user_id
         )
@@ -375,7 +374,8 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         data_type: str,
         enterprise_id: Optional[str],
         team_id: Optional[str],
-        user_id: Optional[str]
+        user_id: Optional[str],
+        is_enterprise_install: Optional[bool] = None
     ) -> str:
         """Helper method to create a path to an object in a GCS bucket.
 
@@ -390,7 +390,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         """
         none = "none"
         e_id = enterprise_id or none
-        t_id = team_id or none
+        t_id = none if is_enterprise_install else team_id or none
 
         workspace_path = f"{self.client_id}/{e_id}-{t_id}"
         return (
