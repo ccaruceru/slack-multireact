@@ -118,7 +118,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         )
         self.logger.debug("Uploaded %s to Google bucket as bot", entity)
 
-    def _save_entity(
+    def _save_entity(  # pylint: disable=R0917
         self,
         data_type: str,
         entity: str,
@@ -369,7 +369,7 @@ class GoogleCloudStorageInstallationStore(InstallationStore, AsyncInstallationSt
         if blob.exists():
             blob.delete()
 
-    def _key(
+    def _key(  # pylint: disable=R0917
         self,
         data_type: str,
         enterprise_id: Optional[str],
