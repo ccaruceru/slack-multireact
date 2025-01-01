@@ -1,6 +1,6 @@
 ### STEP 1: build dependencies
 
-FROM python:3.10-alpine3.17 as builder
+FROM python:3.11-alpine3.17 as builder
 
 RUN apk add gcc==12.2.1_git20220924-r4 musl-dev==1.2.3-r5
 
@@ -11,7 +11,7 @@ RUN pip install -r requirements.txt
 
 ### STEP 2: assemble runtime
 
-FROM python:3.10-alpine3.17
+FROM python:3.11-alpine3.17
 
 ENV UVICORN_PORT=3000
 ENV UVICORN_WORKERS=1
@@ -24,7 +24,7 @@ EXPOSE ${UVICORN_PORT}
 LABEL maintainer="ccaruceru"
 
 # copy built packages
-COPY --from=builder /usr/local/lib/python3.10 /usr/local/lib/python3.10
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 
 WORKDIR /app
 
